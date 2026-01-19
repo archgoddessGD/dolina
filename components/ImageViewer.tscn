@@ -1,0 +1,69 @@
+[gd_scene load_steps=2 format=3 uid="uid://cofi4ghat8ymt"]
+
+[ext_resource type="Script" uid="uid://cqn6xs6puuoni" path="res://components/image_viewer.gd" id="1_s4yqx"]
+
+[node name="ImageViewer" type="ColorRect"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.78431374)
+script = ExtResource("1_s4yqx")
+
+[node name="ImageContainer" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="FullImage" type="TextureRect" parent="ImageContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CloseBtn" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 31.0
+grow_horizontal = 2
+text = "❌ Close ❌"
+
+[node name="PrevBtn" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -26.5
+offset_right = 26.0
+offset_bottom = 26.5
+grow_vertical = 2
+theme_override_font_sizes/font_size = 96
+text = "<"
+
+[node name="NextBtn" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -26.0
+offset_top = -26.5
+offset_bottom = 26.5
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 96
+text = ">"

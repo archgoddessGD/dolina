@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://bk2b15mtqon4c"]
+
+[ext_resource type="Script" uid="uid://6gfk6egpce5s" path="res://components/row.gd" id="1_7bc6w"]
+
+[node name="Row" type="HBoxContainer"]
+size_flags_horizontal = 3
+script = ExtResource("1_7bc6w")

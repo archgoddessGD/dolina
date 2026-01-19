@@ -1,0 +1,64 @@
+[gd_scene load_steps=4 format=3 uid="uid://bqpxyt5nyhpav"]
+
+[ext_resource type="Script" uid="uid://dj0fewjwj3hjs" path="res://components/safety_dialog.gd" id="1_q3i7p"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_q3i7p"]
+content_margin_left = 3.0
+content_margin_right = 3.0
+bg_color = Color(0.4117647, 0.17254902, 0.17254902, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_q3i7p"]
+
+[node name="SafetyDialog" type="ConfirmationDialog"]
+oversampling_override = 1.0
+title = "You sure, cutie?"
+size = Vector2i(200, 112)
+script = ExtResource("1_q3i7p")
+
+[node name="ContentVBox" type="VBoxContainer" parent="."]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 192.0
+offset_bottom = 63.0
+theme_override_constants/separation = 18
+
+[node name="Thumbnail" type="TextureRect" parent="ContentVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PromptLabel" type="Label" parent="ContentVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="InputLine" type="LineEdit" parent="ContentVBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/selection_color = Color(0.5019608, 0, 0, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_q3i7p")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_q3i7p")
+placeholder_text = "Optional: Enter text content..."
+
+[node name="ButtonRow" type="HBoxContainer" parent="ContentVBox"]
+layout_mode = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="BtnPerm" type="Button" parent="ContentVBox/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BtnMain" type="Button" parent="ContentVBox/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BtnCancel" type="Button" parent="ContentVBox/ButtonRow"]
+unique_name_in_owner = true
+layout_mode = 2

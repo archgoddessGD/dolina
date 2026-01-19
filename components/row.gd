@@ -1,0 +1,266 @@
+class_name Row
+extends HBoxContainer
+
+# --- SIGNALS ---
+signal request_full_image(stem: String, path: String)
+signal request_delete_file(path: String)
+signal request_create_txt(stem: String, column: String)
+signal request_save_text(path: String, new_content: String)
+signal request_upload(stem: String, column: String)
+# NEW: Signal for when a file is dropped directly
+signal request_direct_upload(stem: String, column: String, path: String)
+
+var stem: String
+var data: Dictionary
+var columns: Array
+
+const ROW_HEIGHT = 240 
+
+# --- INNER CLASS: Custom Button that accepts files ---
+class DragDropButton extends Button:
+	signal file_dropped(path: String)
+	
+	func _ready() -> void:
+		# Listen to the WINDOW for file drops
+		get_viewport().files_dropped.connect(_on_files_dropped)
+		
+	func _on_files_dropped(files: PackedStringArray) -> void:
+		# 1. Check if the mouse is hovering over THIS button right now
+		if get_global_rect().has_point(get_global_mouse_position()):
+			# 2. Check if visible (safety check)
+			if is_visible_in_tree() and files.size() > 0:
+				file_dropped.emit(files[0])
+
+# ---------------------------------------------------
+
+func setup(_stem: String, _data: Dictionary, _columns: Array, _cell_width: float) -> void:
+	stem = _stem
+	data = _data
+	columns = _columns
+	
+	for child in get_children():
+		child.queue_free()
+	
+	_build_ui(_cell_width)
+
+func _build_ui(cell_width: float) -> void:
+	# 1. Stem Label
+	var stem_label = Label.new()
+	stem_label.text = stem
+	stem_label.custom_minimum_size.x = 150
+	stem_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	stem_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	add_child(stem_label)
+	
+	# --- FIX 1: First VSeparator ---
+	var sep1 = VSeparator.new()
+	sep1.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(sep1)
+	
+	# 2. Dynamic Columns
+	for col_name in columns:
+		var cell_container = HBoxContainer.new()
+		# IMPORTANT: Ensure the cell container itself is transparent to clicks
+		cell_container.mouse_filter = Control.MOUSE_FILTER_IGNORE 
+		
+		cell_container.custom_minimum_size.x = cell_width
+		cell_container.custom_minimum_size.y = ROW_HEIGHT
+		cell_container.size_flags_horizontal = SIZE_EXPAND_FILL 
+		cell_container.alignment = BoxContainer.ALIGNMENT_CENTER
+		
+		var files = data.get(col_name, [])
+		
+		if files.is_empty():
+			_create_empty_state(cell_container, col_name)
+		elif files.size() > 1:
+			_create_conflict_state(cell_container, files)
+		else:
+			_create_file_view(cell_container, files[0], cell_width)
+			
+		add_child(cell_container)
+		
+		# --- FIX 2: VSeparator between columns ---
+		var sep2 = VSeparator.new()
+		sep2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(sep2)
+
+# --- CELL STATES ---
+
+func _create_empty_state(parent: Node, col_name: String) -> void:
+	var vbox = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	parent.add_child(vbox)
+	
+	var btn_create = Button.new()
+	btn_create.text = "+ Create .txt"
+	btn_create.pressed.connect(func(): emit_signal("request_create_txt", stem, col_name))
+	vbox.add_child(btn_create)
+	
+	# CHANGE: Use our custom DragDropButton
+	var btn_upload = DragDropButton.new()
+	# Text with newline for height
+	btn_upload.text = "⬆ Upload File\n(Drag & Drop)"
+	btn_upload.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	
+	# Force minimum height for easier dropping
+	btn_upload.custom_minimum_size.y = 80
+	
+	# Normal click -> Open Dialog
+	btn_upload.pressed.connect(func(): emit_signal("request_upload", stem, col_name))
+	
+	# Drag Drop -> Direct Upload
+	btn_upload.file_dropped.connect(func(path): emit_signal("request_direct_upload", stem, col_name, path))
+	
+	vbox.add_child(btn_upload)
+
+func _create_conflict_state(parent: Node, files: Array) -> void:
+	if parent is BoxContainer: parent.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_horizontal = SIZE_EXPAND_FILL
+	parent.add_child(scroll)
+	var vbox = VBoxContainer.new()
+	scroll.add_child(vbox)
+	var label = Label.new()
+	label.text = "⚠️ Conflict: %d" % files.size()
+	label.modulate = Color.ORANGE
+	vbox.add_child(label)
+	for f_path in files:
+		var row = HBoxContainer.new()
+		vbox.add_child(row)
+		var f_label = Label.new()
+		f_label.text = f_path.get_file()
+		f_label.clip_text = true
+		f_label.size_flags_horizontal = SIZE_EXPAND_FILL
+		row.add_child(f_label)
+		var del_btn = Button.new()
+		del_btn.text = "X"
+		del_btn.modulate = Color.RED
+		del_btn.pressed.connect(func(): emit_signal("request_delete_file", f_path))
+		row.add_child(del_btn)
+
+func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.0) -> void:
+	var ext = file_path.get_extension().to_lower()
+	
+	var sidebar = VBoxContainer.new()
+	sidebar.alignment = BoxContainer.ALIGNMENT_CENTER
+	sidebar.custom_minimum_size.x = 40 
+	var del_btn = Button.new()
+	del_btn.text = "🗑️"
+	del_btn.tooltip_text = "Delete"
+	del_btn.modulate = Color(1, 0.4, 0.4)
+	del_btn.pressed.connect(func(): emit_signal("request_delete_file", file_path))
+	
+	# A. IMAGES
+	if ext in ["png", "jpg", "jpeg", "webp"]:
+		var img_btn = Button.new()
+		img_btn.flat = true
+		img_btn.clip_contents = true
+		img_btn.size_flags_horizontal = SIZE_SHRINK_CENTER
+		img_btn.size_flags_vertical = SIZE_SHRINK_CENTER
+		img_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		
+		# Set initial size to ROW_HEIGHT square, but clamped to max_width just in case
+		var init_size = min(ROW_HEIGHT, max_width - 50)
+		img_btn.custom_minimum_size = Vector2(init_size, ROW_HEIGHT)
+		
+		var placeholder_lbl = Label.new()
+		placeholder_lbl.text = "Loading..."
+		placeholder_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		placeholder_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		placeholder_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		placeholder_lbl.modulate = Color(1, 1, 1, 0.5)
+		img_btn.add_child(placeholder_lbl)
+		
+		var tex_rect = TextureRect.new()
+		tex_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE 
+		tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE 
+		img_btn.add_child(tex_rect)
+		
+		ThumbnailLoader.request_thumbnail(file_path, ROW_HEIGHT * 2, func(texture):
+			if is_instance_valid(img_btn) and texture:
+				tex_rect.texture = texture
+				
+				# --- THE FIX IS HERE ---
+				var t_size = texture.get_size()
+				var aspect = t_size.x / t_size.y
+				
+				# 1. Calculate ideal width based on height
+				var display_h = ROW_HEIGHT
+				var display_w = int(display_h * aspect)
+				
+				# 2. Calculate the safe maximum width
+				# (Column width - Sidebar width - padding)
+				var safe_max_w = max_width - 40 - 10 
+				
+				if display_w > safe_max_w:
+					# 1. Clamp the width
+					display_w = safe_max_w
+					# 2. NEW: Recalculate height so the button shrinks vertically to match the image
+					display_h = display_w / aspect
+				
+				# 3. Clamp the width!
+				# If the image wants to be 900px but column is 300px, force it to 300px.
+				# The TextureRect inside will handle the aspect ratio scaling (letterboxing).
+				display_w = min(display_w, safe_max_w)
+				
+				img_btn.custom_minimum_size = Vector2(display_w, display_h)
+				placeholder_lbl.queue_free()
+		)
+		
+		img_btn.pressed.connect(func(): _on_image_clicked(file_path))
+		
+		parent.add_child(img_btn)
+		sidebar.add_child(del_btn)
+		parent.add_child(sidebar)
+
+# B. TEXT FILES
+	elif ext in ["txt", "md", "json"]:
+		# Align Top-Left so text fills the cell
+		if parent is BoxContainer: parent.alignment = BoxContainer.ALIGNMENT_BEGIN
+		
+		var text_edit = TextEdit.new()
+		text_edit.size_flags_horizontal = SIZE_EXPAND_FILL
+		text_edit.size_flags_vertical = SIZE_EXPAND_FILL
+		text_edit.editable = true
+		text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+		
+		# --- 1. DEFINE THE FLASH ANIMATION HERE ---
+		# We make a reusable function so both the button and shortcut can use it
+		var flash_success = func():
+			var original_modulate = Color(1, 1, 1, 1) # Standard white
+			text_edit.modulate = Color(0.5, 1.0, 0.5) # Flash Green
+			var tween = create_tween()
+			tween.tween_property(text_edit, "modulate", original_modulate, 0.3)
+		# ------------------------------------------
+		
+		# 2. SHORTCUT LOGIC
+		text_edit.gui_input.connect(func(event):
+			if event is InputEventKey and event.pressed and event.keycode == KEY_S:
+				if event.is_command_or_control_pressed():
+					get_viewport().set_input_as_handled()
+					emit_signal("request_save_text", file_path, text_edit.text)
+					flash_success.call() # <--- Call the animation
+		)
+		
+		var f = FileAccess.open(file_path, FileAccess.READ)
+		if f: text_edit.text = f.get_as_text()
+		parent.add_child(text_edit)
+		
+		# 3. BUTTON LOGIC
+		var save_btn = Button.new()
+		save_btn.text = "💾"
+		save_btn.tooltip_text = "Save Changes (Ctrl+S)"
+		save_btn.pressed.connect(func(): 
+			emit_signal("request_save_text", file_path, text_edit.text)
+			flash_success.call() # <--- Call the same animation
+		)
+		
+		sidebar.add_child(save_btn)
+		sidebar.add_child(HSeparator.new())
+		sidebar.add_child(del_btn)
+		parent.add_child(sidebar)
+
+func _on_image_clicked(path: String) -> void:
+	emit_signal("request_full_image", stem, path)

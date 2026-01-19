@@ -1,0 +1,25 @@
+[gd_scene load_steps=3 format=3 uid="uid://pc3rj00lvjvr"]
+
+[ext_resource type="Script" uid="uid://cpnxvjo3jqui3" path="res://components/toast.gd" id="1_5gku0"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hmtm4"]
+content_margin_left = 10.0
+content_margin_top = 5.0
+content_margin_right = 10.0
+content_margin_bottom = 5.0
+bg_color = Color(0.25490198, 0.9411765, 0.58431375, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="Toast" type="PanelContainer"]
+theme_override_styles/panel = SubResource("StyleBoxFlat_hmtm4")
+script = ExtResource("1_5gku0")
+
+[node name="Message" type="Label" parent="."]
+layout_mode = 2
+theme_override_colors/font_color = Color(0, 0, 0, 1)
+text = "SAVED!"
+horizontal_alignment = 1
+vertical_alignment = 1
