@@ -209,7 +209,7 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		sidebar.add_child(del_btn)
 		parent.add_child(sidebar)
 
-	# B. TEXT FILES
+# B. TEXT FILES
 	elif ext in ["txt", "md", "json"]:
 		if parent is BoxContainer: parent.alignment = BoxContainer.ALIGNMENT_BEGIN
 		
@@ -219,40 +219,47 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		text_edit.editable = true
 		text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 		
-		# Define the flash effect
 		var flash_success = func():
 			var original_modulate = Color(1, 1, 1, 1)
-			text_edit.modulate = Color(0.5, 1.0, 0.5) # Green flash
+			text_edit.modulate = Color(0.5, 1.0, 0.5) 
 			var tween = create_tween()
 			tween.tween_property(text_edit, "modulate", original_modulate, 0.3)
 		
+		var autosave_timer: Timer = null 
+		
+		# --- AUTOSAVE LOGIC ---
 		if autosave_enabled:
-			var timer = Timer.new()
-			timer.wait_time = 2.0 # Wait 2 seconds after typing stops
-			timer.one_shot = true
-			text_edit.add_child(timer) # Add timer as child of the text box
+			autosave_timer = Timer.new()
+			autosave_timer.wait_time = 2.0 
+			autosave_timer.one_shot = true
+			autosave_timer.add_to_group("autosave_timers")
 			
-			# When text changes, (re)start the timer
+			text_edit.add_child(autosave_timer) 
+			
 			text_edit.text_changed.connect(func():
-				timer.start()
+				autosave_timer.start()
 			)
 			
-			# When timer finishes, save!
-			timer.timeout.connect(func():
-				# Only save if visible (safety check)
+			autosave_timer.timeout.connect(func():
 				if not text_edit.is_visible_in_tree(): return
-				
 				emit_signal("request_save_text", file_path, text_edit.text)
 				flash_success.call()
-				# Note: Toast is handled by Main connecting to the signal, 
-				# but maybe we want to suppress the toast for autosaves? 
-				# For now, let's keep it to reassure the user.
 			)
+			
+			# Safety cleanup
+			autosave_timer.tree_exiting.connect(func():
+				if not autosave_timer.is_stopped():
+					autosave_timer.timeout.emit()
+			)
+		# ----------------------
 		
 		text_edit.gui_input.connect(func(event):
 			if event is InputEventKey and event.pressed and event.keycode == KEY_S:
 				if event.is_command_or_control_pressed():
 					get_viewport().set_input_as_handled()
+					
+					if autosave_timer: autosave_timer.stop() 
+					
 					emit_signal("request_save_text", file_path, text_edit.text)
 					flash_success.call() 
 		)
@@ -265,6 +272,8 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		save_btn.text = "💾"
 		save_btn.tooltip_text = "Save Changes (Ctrl+S)"
 		save_btn.pressed.connect(func(): 
+			if autosave_timer: autosave_timer.stop()
+			
 			emit_signal("request_save_text", file_path, text_edit.text)
 			flash_success.call() 
 		)

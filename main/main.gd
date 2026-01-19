@@ -68,6 +68,7 @@ func _ready() -> void:
 	get_tree().root.size_changed.connect(_on_window_resized)
 	%ResizeTimer.timeout.connect(_update_ui)
 	%SearchTimer.timeout.connect(_perform_search)
+	get_tree().set_auto_accept_quit(false)
 	
 func _open_settings() -> void:
 	settings_dialog.open(page_size, row_height, project_manager.autosave_enabled)
@@ -574,3 +575,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		scroll_container.scroll_vertical -= 150
 	elif event.is_action_pressed("ui_down", true):
 		scroll_container.scroll_vertical += 150
+
+func _notification(what: int) -> void:
+	# Detect if the user clicked the X button or Alt+F4
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_perform_shutdown_cleanup()
+		get_tree().quit() # Now we manually quit
+
+func _perform_shutdown_cleanup() -> void:
+	# 1. Find all active autosave timers in the application
+	var timers = get_tree().get_nodes_in_group("autosave_timers")
+	var saved_count = 0
+	
+	for timer in timers:
+		if timer is Timer and not timer.is_stopped():
+			# 2. Force the timer to fire its signal NOW
+			timer.timeout.emit()
+			saved_count += 1
+			
+	if saved_count > 0:
+		print("Graceful Shutdown: Forced save on %d files." % saved_count)
