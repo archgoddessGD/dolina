@@ -228,21 +228,14 @@ func _on_file_uploaded(source_path: String) -> void:
 	var stem = _upload_target_info["stem"]
 	var col_name = _upload_target_info["col"]
 	
-	var ext = source_path.get_extension()
-	var target_path = project_manager.datasets_root_path + "/" + project_manager.current_project_name + "/" + col_name + "/" + stem + "." + ext
+	# Use the manager function
+	project_manager.import_file(stem, col_name, source_path)
 	
-	# Simple Copy logic can stay here or move to manager. Keeping here is fine for now.
-	var dir = DirAccess.open(project_manager.datasets_root_path)
-	if dir.copy(source_path, target_path) == OK:
-		_upload_target_info.clear()
-		project_manager.load_project(project_manager.current_project_name)
+	_upload_target_info.clear()
 
 func _handle_direct_upload(stem: String, col_name: String, source_path: String) -> void:
-	var ext = source_path.get_extension()
-	var target_path = project_manager.datasets_root_path + "/" + project_manager.current_project_name + "/" + col_name + "/" + stem + "." + ext
-	var dir = DirAccess.open(project_manager.datasets_root_path)
-	if dir.copy(source_path, target_path) == OK:
-		project_manager.load_project(project_manager.current_project_name)
+	# Use the manager function
+	project_manager.import_file(stem, col_name, source_path)
 
 # --- UI & PAGINATION ---
 

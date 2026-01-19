@@ -19,8 +19,4 @@ export_presets.cfg
 .DS_Store
 .directory
 
-export/
-builds/
-dist/
-
 /android/

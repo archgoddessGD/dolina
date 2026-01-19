@@ -11,10 +11,14 @@ var current_project_name: String = ""
 var current_dataset: Dictionary = {} 
 var current_columns: Array[String] = []
 
+
 # --- PATHS ---
+var _column_path_map: Dictionary = {}
 var datasets_root_path: String = ""
 var deleted_root_path: String = ""
 var _base_data_path: String = ""
+
+const CONFIG_FILENAME = "dolina_dataset_config.json"
 
 func _ready() -> void:
 	_setup_paths()
@@ -71,54 +75,129 @@ func load_project(project_name: String) -> void:
 	current_columns.clear()
 	
 	var proj_path = datasets_root_path + "/" + project_name
+	var config_path = proj_path + "/" + CONFIG_FILENAME
+	
+	# BRANCH: Check if config exists
+	if FileAccess.file_exists(config_path):
+		_load_project_from_config(proj_path, config_path)
+	else:
+		_load_project_from_scan(proj_path)
+
+	project_loaded.emit()
+
+# --- LOADING STRATEGIES ---
+
+# Strategy 1: The original behavior (Scanning subfolders)
+func _load_project_from_scan(proj_path: String) -> void:
+	_column_path_map.clear() # Reset map
+	
 	var dir = DirAccess.open(proj_path)
 	if not dir: 
 		error_occurred.emit("Could not open project folder.")
 		return
 
-	# 1. Scan Columns (Folders)
 	dir.list_dir_begin()
 	var item = dir.get_next()
 	while item != "":
 		if dir.current_is_dir() and not item.begins_with("."):
 			current_columns.append(item)
+			
+			# In scan mode, the path is just the project folder + column name
+			_column_path_map[item] = proj_path + "/" + item
+			
 		item = dir.get_next()
 	current_columns.sort()
 	
-	# 2. Scan Files inside Columns
-	for col in current_columns:
-		var col_path = proj_path + "/" + col
-		var col_dir = DirAccess.open(col_path)
-		if col_dir:
-			col_dir.list_dir_begin()
-			var file = col_dir.get_next()
-			while file != "":
-				if not col_dir.current_is_dir() and not file.begins_with(".") and not file.ends_with(".import"):
-					var stem = file.get_basename() 
-					if not current_dataset.has(stem):
-						current_dataset[stem] = {}
-						for c in current_columns: 
-							current_dataset[stem][c] = []
-					
-					# Ensure the column array exists (for safety)
-					if not current_dataset[stem].has(col):
-						current_dataset[stem][col] = []
-						
-					current_dataset[stem][col].append(col_path + "/" + file)
-				file = col_dir.get_next()
+	for col_name in current_columns:
+		_scan_folder_into_dataset(col_name, _column_path_map[col_name])
 
-	project_loaded.emit()
+func _load_project_from_config(proj_path: String, config_file_path: String) -> void:
+	_column_path_map.clear() # Reset map
+	
+	var f = FileAccess.open(config_file_path, FileAccess.READ)
+	if not f:
+		error_occurred.emit("Failed to read config file.")
+		_load_project_from_scan(proj_path)
+		return
+		
+	var json = JSON.new()
+	var error = json.parse(f.get_as_text())
+	if error != OK:
+		error_occurred.emit("Config JSON Error: " + json.get_error_message())
+		return
+		
+	var data = json.data
+	if not data.has("columns") or not data["columns"] is Array:
+		error_occurred.emit("Config missing 'columns' array.")
+		return
+		
+	for col_def in data["columns"]:
+		var col_name = col_def.get("name", "Unnamed")
+		var raw_path = col_def.get("path", "")
+		var final_path = _resolve_path(proj_path, raw_path)
+		
+		current_columns.append(col_name)
+		
+		# Store the resolved path in our map!
+		_column_path_map[col_name] = final_path
+		
+		if DirAccess.dir_exists_absolute(final_path):
+			_scan_folder_into_dataset(col_name, final_path)
+		else:
+			print("Warning: Configured path not found: ", final_path)
+
+# --- HELPERS ---
+
+# Shared helper to populate current_dataset
+func _scan_folder_into_dataset(col_name: String, folder_path: String) -> void:
+	var dir = DirAccess.open(folder_path)
+	if not dir: return
+	
+	dir.list_dir_begin()
+	var file = dir.get_next()
+	while file != "":
+		# Added check for CONFIG_FILENAME so we don't try to load the config as data
+		if not dir.current_is_dir() and not file.begins_with(".") and not file.ends_with(".import") and file != CONFIG_FILENAME:
+			var stem = file.get_basename() 
+			
+			if not current_dataset.has(stem):
+				current_dataset[stem] = {}
+				# Note: We don't pre-fill all columns here because 
+				# in Config mode, we iterate defined columns, not folders.
+			
+			if not current_dataset[stem].has(col_name):
+				current_dataset[stem][col_name] = []
+			
+			# Store the FULL resolved path
+			current_dataset[stem][col_name].append(folder_path + "/" + file)
+			
+		file = dir.get_next()
+
+func _resolve_path(proj_root: String, raw_path: String) -> String:
+	# If it's an absolute path (e.g. C:/Images), use it directly
+	if raw_path.is_absolute_path():
+		return raw_path
+	
+	# Otherwise, treat it as relative to the project folder
+	# simplify_path cleans up things like "folder/../folder"
+	return (proj_root + "/" + raw_path).simplify_path()
 
 # --- FILE OPERATIONS ---
 
 func create_text_file(stem: String, col_name: String) -> void:
-	var folder_path = datasets_root_path + "/" + current_project_name + "/" + col_name
+	if not _column_path_map.has(col_name):
+		error_occurred.emit("Unknown column: " + col_name)
+		return
+
+	var folder_path = _column_path_map[col_name]
 	var file_path = folder_path + "/" + stem + ".txt"
+	
 	var f = FileAccess.open(file_path, FileAccess.WRITE)
 	if f:
 		f.store_string("")
 		f.close()
-		load_project(current_project_name) # Reload to show changes
+		# Partial reload is hard, simpler to full reload for now
+		load_project(current_project_name)
 
 func save_text_file(path: String, content: String) -> void:
 	var f = FileAccess.open(path, FileAccess.WRITE)
@@ -136,38 +215,53 @@ func delete_file_permanently(path: String) -> void:
 		error_occurred.emit("Failed to delete file.")
 
 func move_file_to_trash(source_path: String) -> void:
-	# 1. Identify structure
-	var relative_path = source_path.replace(datasets_root_path + "/", "")
-	var relative_dir = relative_path.get_base_dir()
-	var file_name = relative_path.get_file()
+	# 1. Determine the destination in the internal deleted_files folder.
+	# We want to preserve hierarchy if possible, but for external files, 
+	# we might just flat-map them or put them in an "External" folder.
 	
-	# 2. Prepare Target
-	var target_dir = deleted_root_path + "/" + relative_dir
+	var target_subpath = ""
+	
+	if source_path.begins_with(datasets_root_path):
+		# It's an internal file, preserve relative structure
+		target_subpath = source_path.replace(datasets_root_path + "/", "")
+	else:
+		# It's external. To avoid path chaos, let's put it in a folder named after the project
+		# and just use the filename.
+		target_subpath = current_project_name + "/External_Deleted/" + source_path.get_file()
+
+	var target_full_path = deleted_root_path + "/" + target_subpath
+	var target_dir = target_full_path.get_base_dir()
+	
 	if not DirAccess.dir_exists_absolute(target_dir):
 		DirAccess.make_dir_recursive_absolute(target_dir)
 	
-	# 3. Handle Conflicts
-	var target_path = target_dir + "/" + file_name
-	var extension = file_name.get_extension()
-	var basename = file_name.get_basename()
-	var counter = 1
+	# 2. Handle File Name Conflicts (Same as before)
+	var final_path = target_full_path
+	var extension = final_path.get_extension()
 	
-	while FileAccess.file_exists(target_path):
-		target_path = target_dir + "/" + basename + " (%d)." % counter + extension
+	# To properly increment, we need the filename base, not full path base
+	var file_basename = final_path.get_file().get_basename()
+	var folder = target_full_path.get_base_dir()
+	
+	var counter = 1
+	while FileAccess.file_exists(final_path):
+		final_path = folder + "/" + file_basename + " (%d)." % counter + extension
 		counter += 1
 		
-	# 4. Move
-	var dir = DirAccess.open(datasets_root_path)
-	if dir:
-		var err = dir.rename(source_path, target_path)
-		if err == OK:
-			toast_requested.emit("Moved to Trash")
-			load_project(current_project_name)
-		else:
-			error_occurred.emit("Error moving file: " + str(err))
+	# 3. Move
+	# We must use DirAccess.rename_absolute because source might be on a different drive
+	var err = DirAccess.rename_absolute(source_path, final_path)
+	if err == OK:
+		toast_requested.emit("Moved to Trash")
+		load_project(current_project_name)
+	else:
+		error_occurred.emit("Error moving file: " + error_string(err))
 
 func populate_empty_files(col_name: String, content: String = "") -> void:
-	var folder_path = datasets_root_path + "/" + current_project_name + "/" + col_name
+	if not _column_path_map.has(col_name):
+		return
+		
+	var folder_path = _column_path_map[col_name]
 	var stems_to_fill = []
 	
 	for stem in current_dataset:
@@ -178,11 +272,28 @@ func populate_empty_files(col_name: String, content: String = "") -> void:
 		var file_path = folder_path + "/" + stem + ".txt"
 		var f = FileAccess.open(file_path, FileAccess.WRITE)
 		if f: 
-			# Use the provided content!
 			f.store_string(content)
 			f.close()
 			
 	load_project(current_project_name)
+
+# Handle Importing Files (Drag & Drop or Dialog)
+# This centralizes the copy logic so Main doesn't need to know about paths.
+func import_file(stem: String, col_name: String, source_path: String) -> void:
+	if not _column_path_map.has(col_name):
+		error_occurred.emit("Column path not found.")
+		return
+		
+	var folder_path = _column_path_map[col_name]
+	var ext = source_path.get_extension()
+	var target_path = folder_path + "/" + stem + "." + ext
+	
+	# Use DirAccess.copy_absolute to support cross-drive copying
+	var err = DirAccess.copy_absolute(source_path, target_path)
+	if err == OK:
+		load_project(current_project_name)
+	else:
+		error_occurred.emit("Import Failed: " + error_string(err))
 	
 func save_config(settings_data: Dictionary) -> void:
 	var path = _base_data_path + "/dolina_settings.json"
