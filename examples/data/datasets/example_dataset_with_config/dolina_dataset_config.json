@@ -1,0 +1,25 @@
+{
+	"columns": [
+		{
+			"name": "IMG EDIT PROMPT",
+			"path": "../example_dataset_without_config/edit_prompts"
+		},
+		{
+			"name": "Input",
+			"path": "../example_dataset_without_config/kitty_control"
+		},
+		{
+			"name": "Reference",
+			"path": "../example_dataset_without_config/kitty_reference"
+		},
+		{
+			"name": "Output",
+			"path": "../example_dataset_without_config/kitty_target"
+
+		},
+		{
+			"name": "TXT2IMG PROMPT",
+			"path": "../example_dataset_without_config/img_prompts"
+		}
+	]
+}
