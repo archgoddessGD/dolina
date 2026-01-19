@@ -316,3 +316,6 @@ func load_config() -> Dictionary:
 		if error == OK:
 			return json.data
 	return {}
+	
+func get_column_path(col_name: String) -> String:
+	return _column_path_map.get(col_name, "")

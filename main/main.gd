@@ -284,15 +284,33 @@ func _update_ui() -> void:
 		header_hbox.custom_minimum_size.x = col_width
 		header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 		
+		# 1. Column Name
 		var label = Label.new()
 		label.text = col.to_upper()
 		label.label_settings = LabelSettings.new()
 		label.label_settings.font_color = Color("41f095")
 		header_hbox.add_child(label)
 		
+		# NEW 2. Open Folder Button
+		var folder_btn = Button.new()
+		folder_btn.text = "📂" # Simple unicode folder icon
+		folder_btn.tooltip_text = "Open in File Explorer"
+		folder_btn.focus_mode = Control.FOCUS_NONE
+		folder_btn.flat = true
+		folder_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		# Connect to OS.shell_open
+		folder_btn.pressed.connect(func(): 
+			var path = project_manager.get_column_path(col)
+			if path: 
+				# Globalize path ensures it works for "res://" paths in editor mode too
+				OS.shell_open(ProjectSettings.globalize_path(path))
+		)
+		header_hbox.add_child(folder_btn)
+		
+		# 3. Fill Button (Existing)
 		var flash_btn = Button.new()
 		flash_btn.text = "⚡ FILL" 
-		flash_btn.tooltip_text = "Bulk populate..." 
+		flash_btn.tooltip_text = "Bulk populate empty rows in this column with .txt files" 
 		flash_btn.focus_mode = Control.FOCUS_NONE
 		flash_btn.flat = true
 		flash_btn.modulate = Color("41f095") 
@@ -300,6 +318,7 @@ func _update_ui() -> void:
 		flash_btn.pressed.connect(_handle_bulk_populate.bind(col))
 		header_hbox.add_child(flash_btn)
 		
+		# 4. Search (Existing)
 		var col_search = LineEdit.new()
 		col_search.placeholder_text = "Search..."
 		col_search.size_flags_horizontal = SIZE_EXPAND_FILL
