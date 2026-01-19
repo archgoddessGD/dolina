@@ -2,7 +2,8 @@ class_name Main
 extends Control
 
 # --- CONFIG ---
-const PAGE_SIZE: int = 10
+var page_size: int = 10
+var row_height: int = 240 # Default height
 const RowScene = preload("res://components/Row.tscn")
 const ToastScene = preload("res://components/Toast.tscn")
 
@@ -10,15 +11,17 @@ const ToastScene = preload("res://components/Toast.tscn")
 @onready var project_select: OptionButton = %ProjectSelect
 @onready var row_container: VBoxContainer = %RowContainer
 @onready var column_headers: HBoxContainer = $MarginContainer/VBox/ColumnHeaders
-@onready var prev_btn: Button = $PaginationPanel/PaginationHBox/PrevBtn
-@onready var page_input: LineEdit = $PaginationPanel/PaginationHBox/PageInput
-@onready var total_label: Label = $PaginationPanel/PaginationHBox/TotalLabel
-@onready var next_btn: Button = $PaginationPanel/PaginationHBox/NextBtn
+@onready var prev_btn: Button = %PrevBtn
+@onready var page_input: LineEdit = %PageInput
+@onready var total_label: Label = %TotalLabel
+@onready var next_btn: Button = %NextBtn
 @onready var refresh_btn: Button = $MarginContainer/VBox/Header/RefreshBtn
 @onready var upload_dialog: FileDialog = %UploadDialog
 @onready var safety_dialog: SafetyDialog = %SafetyDialog
 @onready var scroll_container: ScrollContainer = $MarginContainer/VBox/ScrollContainer
 @onready var background: ColorRect = $Background
+@onready var settings_btn: Button = %SettingsBtn
+@onready var settings_dialog: SettingsDialog = %SettingsDialog
 
 # --- DATA CONTROLLER ---
 @onready var project_manager: ProjectManager = %ProjectManager
@@ -38,6 +41,12 @@ var _is_restoring_view: bool = false
 func _ready() -> void:
 	_connect_signals()
 	
+	var saved_settings = project_manager.load_config()
+	if saved_settings.has("page_size"):
+		page_size = int(saved_settings["page_size"])
+	if saved_settings.has("row_height"):
+		row_height = int(saved_settings["row_height"])
+	
 	# Setup Focus/Background clicking
 	background.mouse_filter = Control.MOUSE_FILTER_STOP
 	background.gui_input.connect(_on_background_clicked)
@@ -53,7 +62,29 @@ func _ready() -> void:
 	get_tree().root.size_changed.connect(_on_window_resized)
 	%ResizeTimer.timeout.connect(_update_ui)
 	%SearchTimer.timeout.connect(_perform_search)
+	
+	# CONNECT SETTINGS
+	settings_btn.pressed.connect(_open_settings)
+	settings_dialog.settings_changed.connect(_on_settings_changed)
+	
+func _open_settings() -> void:
+	settings_dialog.open(page_size, row_height)
 
+func _on_settings_changed(new_size: int, new_height: int) -> void:
+	page_size = new_size
+	row_height = new_height
+	
+	var data = {
+		"page_size": page_size,
+		"row_height": row_height
+	}
+	project_manager.save_config(data)
+	
+	# Refresh the grid to apply changes
+	_calculate_pagination()
+	_render_grid()
+	_update_pagination_labels()
+	
 func _connect_signals() -> void:
 	# UI Signals
 	project_select.item_selected.connect(_on_project_selected)
@@ -231,7 +262,7 @@ func _calculate_pagination() -> void:
 		total_rows = project_manager.current_dataset.keys().size()
 		
 	if total_rows == 0: total_pages = 1
-	else: total_pages = ceil(float(total_rows) / float(PAGE_SIZE))
+	else: total_pages = ceil(float(total_rows) / float(page_size))
 	
 	if current_page > total_pages: current_page = total_pages
 	if current_page < 1: current_page = 1
@@ -304,8 +335,8 @@ func _render_grid(col_width: float = -1.0) -> void:
 		source_list = dataset.keys()
 		source_list.sort()
 	
-	var start_index = (current_page - 1) * PAGE_SIZE
-	var end_index = min(start_index + PAGE_SIZE, source_list.size())
+	var start_index = (current_page - 1) * page_size
+	var end_index = min(start_index + page_size, source_list.size())
 	
 	for i in range(start_index, end_index):
 		var stem = source_list[i]
@@ -313,7 +344,7 @@ func _render_grid(col_width: float = -1.0) -> void:
 		
 		var row_instance = RowScene.instantiate()
 		row_container.add_child(row_instance)
-		row_instance.setup(stem, row_data, project_manager.current_columns, col_width)
+		row_instance.setup(stem, row_data, project_manager.current_columns, col_width, row_height)
 		
 		row_instance.request_full_image.connect(_on_row_request_image)
 		row_instance.request_create_txt.connect(_handle_create_txt)

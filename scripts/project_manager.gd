@@ -183,3 +183,25 @@ func populate_empty_files(col_name: String, content: String = "") -> void:
 			f.close()
 			
 	load_project(current_project_name)
+	
+func save_config(settings_data: Dictionary) -> void:
+	var path = _base_data_path + "/dolina_settings.json"
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	if file:
+		var json_string = JSON.stringify(settings_data, "\t") # \t makes it pretty-printed
+		file.store_string(json_string)
+		file.close()
+
+func load_config() -> Dictionary:
+	var path = _base_data_path + "/dolina_settings.json"
+	if not FileAccess.file_exists(path):
+		return {} # Return empty if no file exists
+		
+	var file = FileAccess.open(path, FileAccess.READ)
+	if file:
+		var content = file.get_as_text()
+		var json = JSON.new()
+		var error = json.parse(content)
+		if error == OK:
+			return json.data
+	return {}

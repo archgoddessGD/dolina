@@ -33,7 +33,7 @@ class DragDropButton extends Button:
 
 # ---------------------------------------------------
 
-func setup(_stem: String, _data: Dictionary, _columns: Array, _cell_width: float) -> void:
+func setup(_stem: String, _data: Dictionary, _columns: Array, _cell_width: float, _row_height: float) -> void:
 	stem = _stem
 	data = _data
 	columns = _columns
@@ -41,9 +41,10 @@ func setup(_stem: String, _data: Dictionary, _columns: Array, _cell_width: float
 	for child in get_children():
 		child.queue_free()
 	
-	_build_ui(_cell_width)
+	# Pass row_height down to the builder
+	_build_ui(_cell_width, _row_height)
 
-func _build_ui(cell_width: float) -> void:
+func _build_ui(cell_width: float, row_height: float) -> void:
 	# 1. Stem Label
 	var stem_label = Label.new()
 	stem_label.text = stem
@@ -52,7 +53,7 @@ func _build_ui(cell_width: float) -> void:
 	stem_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	add_child(stem_label)
 	
-	# --- FIX 1: First VSeparator ---
+	# Fix 1: First VSeparator
 	var sep1 = VSeparator.new()
 	sep1.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(sep1)
@@ -60,11 +61,14 @@ func _build_ui(cell_width: float) -> void:
 	# 2. Dynamic Columns
 	for col_name in columns:
 		var cell_container = HBoxContainer.new()
-		# IMPORTANT: Ensure the cell container itself is transparent to clicks
+		# Click-through
 		cell_container.mouse_filter = Control.MOUSE_FILTER_IGNORE 
 		
 		cell_container.custom_minimum_size.x = cell_width
-		cell_container.custom_minimum_size.y = ROW_HEIGHT
+		
+		# --- USE VARIABLE HERE ---
+		cell_container.custom_minimum_size.y = row_height 
+		
 		cell_container.size_flags_horizontal = SIZE_EXPAND_FILL 
 		cell_container.alignment = BoxContainer.ALIGNMENT_CENTER
 		
@@ -75,11 +79,12 @@ func _build_ui(cell_width: float) -> void:
 		elif files.size() > 1:
 			_create_conflict_state(cell_container, files)
 		else:
-			_create_file_view(cell_container, files[0], cell_width)
+			# --- PASS VARIABLE HERE TOO ---
+			_create_file_view(cell_container, files[0], cell_width, row_height)
 			
 		add_child(cell_container)
 		
-		# --- FIX 2: VSeparator between columns ---
+		# Fix 2: VSeparator between columns
 		var sep2 = VSeparator.new()
 		sep2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(sep2)
@@ -137,8 +142,8 @@ func _create_conflict_state(parent: Node, files: Array) -> void:
 		del_btn.modulate = Color.RED
 		del_btn.pressed.connect(func(): emit_signal("request_delete_file", f_path))
 		row.add_child(del_btn)
-
-func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.0) -> void:
+		
+func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.0, row_height: float = 240.0) -> void:
 	var ext = file_path.get_extension().to_lower()
 	
 	var sidebar = VBoxContainer.new()
@@ -159,9 +164,9 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		img_btn.size_flags_vertical = SIZE_SHRINK_CENTER
 		img_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		
-		# Set initial size to ROW_HEIGHT square, but clamped to max_width just in case
-		var init_size = min(ROW_HEIGHT, max_width - 50)
-		img_btn.custom_minimum_size = Vector2(init_size, ROW_HEIGHT)
+		# --- USE VARIABLE HERE ---
+		var init_size = min(row_height, max_width - 50)
+		img_btn.custom_minimum_size = Vector2(init_size, row_height)
 		
 		var placeholder_lbl = Label.new()
 		placeholder_lbl.text = "Loading..."
@@ -178,31 +183,24 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE 
 		img_btn.add_child(tex_rect)
 		
-		ThumbnailLoader.request_thumbnail(file_path, ROW_HEIGHT * 2, func(texture):
+		# --- USE VARIABLE HERE ---
+		ThumbnailLoader.request_thumbnail(file_path, int(row_height * 2), func(texture):
 			if is_instance_valid(img_btn) and texture:
 				tex_rect.texture = texture
 				
-				# --- THE FIX IS HERE ---
 				var t_size = texture.get_size()
 				var aspect = t_size.x / t_size.y
 				
-				# 1. Calculate ideal width based on height
-				var display_h = ROW_HEIGHT
+				# --- USE VARIABLE HERE ---
+				var display_h = row_height
 				var display_w = int(display_h * aspect)
 				
-				# 2. Calculate the safe maximum width
-				# (Column width - Sidebar width - padding)
 				var safe_max_w = max_width - 40 - 10 
 				
 				if display_w > safe_max_w:
-					# 1. Clamp the width
 					display_w = safe_max_w
-					# 2. NEW: Recalculate height so the button shrinks vertically to match the image
 					display_h = display_w / aspect
 				
-				# 3. Clamp the width!
-				# If the image wants to be 900px but column is 300px, force it to 300px.
-				# The TextureRect inside will handle the aspect ratio scaling (letterboxing).
 				display_w = min(display_w, safe_max_w)
 				
 				img_btn.custom_minimum_size = Vector2(display_w, display_h)
@@ -215,9 +213,8 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		sidebar.add_child(del_btn)
 		parent.add_child(sidebar)
 
-# B. TEXT FILES
+	# B. TEXT FILES (Remain unchanged, but they now benefit from the taller cell)
 	elif ext in ["txt", "md", "json"]:
-		# Align Top-Left so text fills the cell
 		if parent is BoxContainer: parent.alignment = BoxContainer.ALIGNMENT_BEGIN
 		
 		var text_edit = TextEdit.new()
@@ -226,35 +223,30 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		text_edit.editable = true
 		text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 		
-		# --- 1. DEFINE THE FLASH ANIMATION HERE ---
-		# We make a reusable function so both the button and shortcut can use it
 		var flash_success = func():
-			var original_modulate = Color(1, 1, 1, 1) # Standard white
-			text_edit.modulate = Color(0.5, 1.0, 0.5) # Flash Green
+			var original_modulate = Color(1, 1, 1, 1) 
+			text_edit.modulate = Color(0.5, 1.0, 0.5) 
 			var tween = create_tween()
 			tween.tween_property(text_edit, "modulate", original_modulate, 0.3)
-		# ------------------------------------------
 		
-		# 2. SHORTCUT LOGIC
 		text_edit.gui_input.connect(func(event):
 			if event is InputEventKey and event.pressed and event.keycode == KEY_S:
 				if event.is_command_or_control_pressed():
 					get_viewport().set_input_as_handled()
 					emit_signal("request_save_text", file_path, text_edit.text)
-					flash_success.call() # <--- Call the animation
+					flash_success.call() 
 		)
 		
 		var f = FileAccess.open(file_path, FileAccess.READ)
 		if f: text_edit.text = f.get_as_text()
 		parent.add_child(text_edit)
 		
-		# 3. BUTTON LOGIC
 		var save_btn = Button.new()
 		save_btn.text = "💾"
 		save_btn.tooltip_text = "Save Changes (Ctrl+S)"
 		save_btn.pressed.connect(func(): 
 			emit_signal("request_save_text", file_path, text_edit.text)
-			flash_success.call() # <--- Call the same animation
+			flash_success.call() 
 		)
 		
 		sidebar.add_child(save_btn)

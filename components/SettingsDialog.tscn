@@ -1,0 +1,37 @@
+[gd_scene load_steps=2 format=3 uid="uid://c58bmeeukos2g"]
+
+[ext_resource type="Script" uid="uid://fp3bk4fanucp" path="res://components/settings_dialog.gd" id="1_dtdv5"]
+
+[node name="SettingsDialog" type="AcceptDialog"]
+title = "Settings"
+ok_button_text = "Apply"
+script = ExtResource("1_dtdv5")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Label" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Rows Per Page"
+
+[node name="RowsInput" type="SpinBox" parent="VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+value = 10.0
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label2" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+text = "Row Height (px)"
+
+[node name="HeightInput" type="SpinBox" parent="VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 50.0
+max_value = 1000.0
+step = 10.0
+value = 240.0

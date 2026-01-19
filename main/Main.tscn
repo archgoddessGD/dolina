@@ -1,11 +1,26 @@
-[gd_scene load_steps=7 format=3 uid="uid://cqyl562ctjiib"]
+[gd_scene load_steps=9 format=3 uid="uid://cqyl562ctjiib"]
 
 [ext_resource type="Theme" uid="uid://duyeylfni0bvn" path="res://assets/DolinaTheme.tres" id="1_cmtxc"]
 [ext_resource type="Script" uid="uid://badu0bax2jj71" path="res://main/main.gd" id="1_qv31u"]
 [ext_resource type="Texture2D" uid="uid://yp7p7sxvjkta" path="res://assets/dolina_logo.svg" id="2_5kcm4"]
 [ext_resource type="PackedScene" uid="uid://cofi4ghat8ymt" path="res://components/ImageViewer.tscn" id="2_wbnyf"]
+[ext_resource type="PackedScene" uid="uid://c58bmeeukos2g" path="res://components/SettingsDialog.tscn" id="4_o80qs"]
 [ext_resource type="PackedScene" uid="uid://bqpxyt5nyhpav" path="res://components/SafetyDialog.tscn" id="5_tv7ag"]
 [ext_resource type="Script" uid="uid://ck0mkthqv2w5j" path="res://scripts/project_manager.gd" id="6_qtrhv"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_o80qs"]
+content_margin_left = 12.0
+content_margin_right = 12.0
+bg_color = Color(0.101960786, 0.101960786, 0.101960786, 0.78431374)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.1764706, 0.23137255, 0.20392157, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -86,39 +101,54 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="PaginationPanel" type="PanelContainer" parent="."]
+[node name="TopRightHBox" type="HBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -150.0
+offset_left = -224.0
 offset_top = 12.0
-offset_right = -30.0
-offset_bottom = 72.0
+offset_right = -12.0
+offset_bottom = 66.0
 grow_horizontal = 0
-mouse_filter = 2
+theme_override_constants/separation = 9
 
-[node name="PaginationHBox" type="HBoxContainer" parent="PaginationPanel"]
+[node name="PaginationPanel" type="PanelContainer" parent="TopRightHBox"]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="PrevBtn" type="Button" parent="PaginationPanel/PaginationHBox"]
+[node name="PaginationHBox" type="HBoxContainer" parent="TopRightHBox/PaginationPanel"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PrevBtn" type="Button" parent="TopRightHBox/PaginationPanel/PaginationHBox"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "◀"
 
-[node name="PageInput" type="LineEdit" parent="PaginationPanel/PaginationHBox"]
+[node name="PageInput" type="LineEdit" parent="TopRightHBox/PaginationPanel/PaginationHBox"]
+unique_name_in_owner = true
 layout_mode = 2
 alignment = 1
 
-[node name="TotalLabel" type="Label" parent="PaginationPanel/PaginationHBox"]
+[node name="TotalLabel" type="Label" parent="TopRightHBox/PaginationPanel/PaginationHBox"]
+unique_name_in_owner = true
 layout_mode = 2
 text = "/ 1"
 
-[node name="NextBtn" type="Button" parent="PaginationPanel/PaginationHBox"]
+[node name="NextBtn" type="Button" parent="TopRightHBox/PaginationPanel/PaginationHBox"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 text = "▶"
+
+[node name="SettingsBtn" type="Button" parent="TopRightHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+theme_override_styles/normal = SubResource("StyleBoxFlat_o80qs")
+text = "⚙"
 
 [node name="ToastLayer" type="Control" parent="."]
 layout_mode = 1
@@ -146,6 +176,9 @@ unique_name_in_owner = true
 title = "Open a File"
 file_mode = 0
 access = 2
+
+[node name="SettingsDialog" parent="." instance=ExtResource("4_o80qs")]
+unique_name_in_owner = true
 
 [node name="ImageViewer" parent="." instance=ExtResource("2_wbnyf")]
 unique_name_in_owner = true
