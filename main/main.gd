@@ -291,14 +291,14 @@ func _update_ui() -> void:
 		header_hbox.custom_minimum_size.x = col_width
 		header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 		
-		# 1. Column Name
+		# Column Name
 		var label = Label.new()
 		label.text = col.to_upper()
 		label.label_settings = LabelSettings.new()
 		label.label_settings.font_color = Color("41f095")
 		header_hbox.add_child(label)
 		
-		# NEW 2. Open Folder Button
+		# Open Folder Button
 		var folder_btn = Button.new()
 		folder_btn.text = "📂" # Simple unicode folder icon
 		folder_btn.tooltip_text = "Open in File Explorer"
@@ -316,7 +316,7 @@ func _update_ui() -> void:
 		
 		# 3. Fill Button (Existing)
 		var flash_btn = Button.new()
-		flash_btn.text = "⚡ FILL" 
+		flash_btn.text = "FILL" 
 		flash_btn.tooltip_text = "Bulk populate empty rows in this column with .txt files" 
 		flash_btn.focus_mode = Control.FOCUS_NONE
 		flash_btn.flat = true

@@ -1,0 +1,1 @@
+Rotate this cat so that we can see it from the side but have its head still face the viewer
