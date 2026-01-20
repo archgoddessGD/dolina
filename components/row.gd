@@ -211,6 +211,7 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		
 		var text_edit = TextEdit.new()
 		text_edit.size_flags_horizontal = SIZE_EXPAND_FILL
+		text_edit.set_meta("file_path", file_path)
 		text_edit.size_flags_vertical = SIZE_EXPAND_FILL
 		text_edit.editable = true
 		text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
@@ -317,6 +318,41 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		sidebar.add_child(save_btn)
 		sidebar.add_child(del_btn)
 		parent.add_child(sidebar)
-
+		
 func _on_image_clicked(path: String) -> void:
 	emit_signal("request_full_image", stem, path)
+	
+# Updates a specific text box in this row without reloading everything
+func update_text_cell(file_path: String, new_content: String) -> void:
+	var text_edit = _find_text_edit_for_path(self, file_path)
+	
+	if text_edit:
+		# Don't update if content is identical (prevents cursor jump if no changes)
+		if text_edit.text == new_content: return
+		
+		var current_cursor = text_edit.get_caret_line()
+		var current_col = text_edit.get_caret_column()
+		
+		text_edit.text = new_content
+		
+		# Restore cursor approximate position
+		text_edit.set_caret_line(current_cursor)
+		text_edit.set_caret_column(current_col)
+		
+		# Visual feedback
+		var original_modulate = Color(1, 1, 1, 1)
+		text_edit.modulate = Color(0.5, 1.0, 0.5)
+		var tween = create_tween()
+		tween.tween_property(text_edit, "modulate", original_modulate, 0.5)
+		
+# Helper to find the tagged TextEdit
+func _find_text_edit_for_path(parent: Node, target_path: String) -> TextEdit:
+	for child in parent.get_children():
+		if child is TextEdit:
+			if child.has_meta("file_path") and child.get_meta("file_path") == target_path:
+				return child
+		
+		# Recursively search children (because of Containers/Sidebars)
+		var found = _find_text_edit_for_path(child, target_path)
+		if found: return found
+	return null

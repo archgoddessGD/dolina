@@ -2,7 +2,8 @@ class_name TextEditor
 extends ColorRect
 
 signal request_save(path: String, content: String)
-signal closed 
+# NEW: Signal now carries data for smart updating
+signal closed(path: String, content: String)
 
 @onready var title_label: Label = %TitleLabel
 @onready var editor: CodeEdit = %Editor
@@ -11,7 +12,7 @@ signal closed
 @onready var status_label: Label = %StatusLabel
 @onready var sheet: PanelContainer = $Sheet
 
-# --- SEARCH UI NODES ---
+# Search UI
 @onready var search_panel: PanelContainer = $Sheet/VBoxContainer/SearchPanel
 @onready var find_bar: HBoxContainer = $Sheet/VBoxContainer/SearchPanel/VBoxContainer/FindBar
 @onready var replace_bar: HBoxContainer = $Sheet/VBoxContainer/SearchPanel/VBoxContainer/ReplaceBar
@@ -24,6 +25,10 @@ signal closed
 @onready var replace_one_btn: Button = %ReplaceOneBtn
 @onready var replace_all_btn: Button = %ReplaceAllBtn
 
+# NEW: Toolbar Buttons
+@onready var search_btn: Button = %SearchBtn
+@onready var replace_btn: Button = %ReplaceBtn
+
 var _current_path: String = ""
 var _autosave_enabled: bool = false
 var _autosave_timer: Timer
@@ -34,6 +39,10 @@ func _ready() -> void:
 	
 	close_btn.pressed.connect(_close)
 	save_btn.pressed.connect(_manual_save)
+	
+	# NEW: Connect Toolbar Buttons
+	search_btn.pressed.connect(func(): _open_search(false))
+	replace_btn.pressed.connect(func(): _open_search(true))
 	
 	_autosave_timer = Timer.new()
 	_autosave_timer.wait_time = 2.0
@@ -51,26 +60,28 @@ func _ready() -> void:
 	
 	gui_input.connect(_on_background_input)
 	editor.gui_input.connect(_on_editor_input)
-	set_process_unhandled_input(true)
 
-	# --- SEARCH CONNECTIONS ---
+	# Search Connections
 	close_search_btn.pressed.connect(_close_search)
 	find_next_btn.pressed.connect(_find_next)
 	find_prev_btn.pressed.connect(_find_prev)
-	find_input.text_submitted.connect(func(_text): _find_next()) # Enter key in box
-	
+	find_input.text_submitted.connect(func(_text): _find_next())
 	replace_one_btn.pressed.connect(_replace_one)
 	replace_all_btn.pressed.connect(_replace_all)
 
-func _unhandled_input(event: InputEvent) -> void:
+# FIX: Use _input instead of _unhandled_input to catch ESC even when LineEdit has focus
+func _input(event: InputEvent) -> void:
 	if not visible: return
+	
 	if event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		# Logic: If search is open, close search first. Otherwise close editor.
+		# Check if we should just close the search panel
 		if search_panel.visible:
 			_close_search()
+			get_viewport().set_input_as_handled() 
 		else:
+			# If search is already closed, close the editor
 			_close()
+			get_viewport().set_input_as_handled()
 
 func open(path: String, content: String, autosave_on: bool) -> void:
 	_current_path = path
@@ -84,7 +95,7 @@ func open(path: String, content: String, autosave_on: bool) -> void:
 	status_label.text = "Ready"
 	
 	_autosave_timer.stop()
-	_close_search() # Ensure search is closed on fresh open
+	_close_search()
 	
 	show()
 	editor.grab_focus()
@@ -108,7 +119,8 @@ func _close() -> void:
 	if not _autosave_timer.is_stopped():
 		_perform_save("Saved on close")
 	hide()
-	closed.emit()
+	# UPDATED: Emit path and content so Main can smart-update the grid
+	closed.emit(_current_path, editor.text)
 
 func _on_background_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -116,34 +128,25 @@ func _on_background_input(event: InputEvent) -> void:
 			_close()
 
 func _on_editor_input(event: InputEvent) -> void:
-	# Ctrl+S
 	if event is InputEventKey and event.pressed and event.keycode == KEY_S:
 		if event.is_command_or_control_pressed():
 			get_viewport().set_input_as_handled()
 			_manual_save()
-	
-	# Ctrl+F (Find)
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_F:
 		if event.is_command_or_control_pressed():
 			get_viewport().set_input_as_handled()
-			_open_search(false) # False = Search Only
-			
-	# Ctrl+R (Replace)
+			_open_search(false)
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_R:
 		if event.is_command_or_control_pressed():
 			get_viewport().set_input_as_handled()
-			_open_search(true) # True = Show Replace
+			_open_search(true)
 
-# --- SEARCH & REPLACE LOGIC ---
-
+# ... (Search logic remains the same as previous) ...
 func _open_search(show_replace: bool) -> void:
 	search_panel.show()
 	replace_bar.visible = show_replace
-	
-	# If text is selected in editor, use it as search query
 	if editor.has_selection():
 		find_input.text = editor.get_selected_text()
-	
 	find_input.grab_focus()
 	find_input.select_all()
 
@@ -163,23 +166,12 @@ func _perform_search(reverse: bool) -> void:
 	if query.is_empty(): 
 		match_label.text = ""
 		return
-	
-	# Search flags: 1 = Match Case? No, let's keep simple. 
-	# 0 = Standard (Case Sensitive by default in Godot backend usually, but let's just run it)
-	# To make it case-insensitive we would need TextEdit.SEARCH_FLAG_CASE_INSENSITIVE
-	# Note: In Godot 4.x, search flags are Enums. 2 = Case Insensitive.
 	var flags = 2 
-	if reverse: flags += 1 # 1 = Backwards
-	
-	# Search from current caret position
+	if reverse: flags += 1 
 	var line = editor.get_caret_line()
 	var col = editor.get_caret_column()
-	
 	var result = editor.search(query, flags, line, col)
-	
 	if result.x != -1:
-		# Found!
-		# Select the result (this highlights it)
 		editor.select(result.y, result.x, result.y, result.x + query.length())
 		editor.set_caret_line(result.y)
 		editor.set_caret_column(result.x + query.length())
@@ -187,11 +179,8 @@ func _perform_search(reverse: bool) -> void:
 		match_label.text = "Found"
 		match_label.modulate = Color.WHITE
 	else:
-		# Not found from cursor... wrap around?
-		# Let's try searching from the beginning (or end)
 		var start_line = 0 if not reverse else editor.get_line_count() - 1
 		var start_col = 0 if not reverse else editor.get_line_width(start_line)
-		
 		var retry = editor.search(query, flags, start_line, start_col)
 		if retry.x != -1:
 			editor.select(retry.y, retry.x, retry.y, retry.x + query.length())
@@ -208,27 +197,21 @@ func _replace_one() -> void:
 	var query = find_input.text
 	var replacement = replace_input.text
 	if query.is_empty(): return
-	
-	# If we currently have the query selected, replace it immediately
 	if editor.has_selection() and editor.get_selected_text() == query:
 		editor.insert_text_at_caret(replacement)
-		# After replace, find next
 		_find_next()
 	else:
-		# If we haven't selected it yet, find it first
 		_find_next()
 
 func _replace_all() -> void:
 	var query = find_input.text
 	var replacement = replace_input.text
 	if query.is_empty(): return
-	
 	var text_content = editor.text
 	var new_text = text_content.replace(query, replacement)
-	
 	if text_content != new_text:
 		editor.text = new_text
 		status_label.text = "Replaced All"
-		_manual_save() # Good practice to save after a bulk op
+		_manual_save()
 	else:
 		match_label.text = "Nothing to replace"

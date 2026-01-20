@@ -36,11 +36,25 @@ layout_mode = 2
 [node name="SaveBtn" type="Button" parent="Sheet/VBoxContainer/Toolbar"]
 unique_name_in_owner = true
 layout_mode = 2
+tooltip_text = "Save (Ctrl+S)"
 text = "💾 Save"
+
+[node name="SearchBtn" type="Button" parent="Sheet/VBoxContainer/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Find (Ctrl+F)"
+text = "Search"
+
+[node name="ReplaceBtn" type="Button" parent="Sheet/VBoxContainer/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Replace (Ctrl+R)"
+text = "Replace"
 
 [node name="CloseBtn" type="Button" parent="Sheet/VBoxContainer/Toolbar"]
 unique_name_in_owner = true
 layout_mode = 2
+tooltip_text = "Close (Esc)"
 text = "❌ Close"
 
 [node name="Editor" type="CodeEdit" parent="Sheet/VBoxContainer"]

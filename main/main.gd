@@ -76,6 +76,17 @@ func _ready() -> void:
 	# Connect the Expanded Editor Save to our main save handler
 	text_editor.request_save.connect(_handle_save_text)
 	
+	text_editor.closed.connect(func(path, new_content):
+		# Extract the stem (e.g., "apple" from "apple.txt")
+		var stem = path.get_file().get_basename()
+		
+		# Look for the visible row with that stem
+		for child in row_container.get_children():
+			if child is Row and child.stem == stem:
+				child.update_text_cell(path, new_content)
+				break
+	)
+	
 	# When editor closes, refresh the grid so the small text box updates
 	text_editor.closed.connect(func():
 		_render_grid() 
