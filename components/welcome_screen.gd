@@ -4,7 +4,7 @@ extends ColorRect
 # --- SIGNALS ---
 # Emitted when the user makes a choice. 
 # passing "" (empty string) implies they chose to Skip.
-signal setup_completed(selected_path: String)
+signal setup_completed(selected_path: String, is_portable: bool)
 
 # --- NODES ---
 @onready var btn_portable: Button = %BtnPortable
@@ -28,26 +28,22 @@ func _connect_signals() -> void:
 # --- ACTION HANDLERS ---
 
 func _on_portable_pressed() -> void:
-	# Logic: Get the executable directory + "/data"
 	var exe_dir = OS.get_executable_path().get_base_dir()
-	
-	# macOS Fix: If inside an .app bundle, step out to the actual folder
 	if OS.get_name() == "macOS" and exe_dir.contains(".app"):
 		exe_dir = exe_dir.get_base_dir().get_base_dir().get_base_dir().get_base_dir()
 		
 	var target_path = exe_dir.path_join("data")
 	
-	# Emit immediately
-	setup_completed.emit(target_path)
+	# TRUE for portable
+	setup_completed.emit(target_path, true) 
 
 func _on_custom_pressed() -> void:
-	# Reusing the logic you already know: Open the dialog
 	dir_dialog.popup_centered()
 
 func _on_custom_dir_selected(path: String) -> void:
-	# Pass the user's selection back
-	setup_completed.emit(path)
+	# FALSE for custom
+	setup_completed.emit(path, false) 
 
 func _on_skip_pressed() -> void:
-	# Emit empty string to signify "Do nothing"
-	setup_completed.emit("")
+	# FALSE (doesn't matter since path is empty)
+	setup_completed.emit("", false)

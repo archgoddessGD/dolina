@@ -23,6 +23,7 @@ const WelcomeScene = preload("res://components/WelcomeScreen.tscn")
 @onready var background: ColorRect = $Background
 @onready var settings_btn: Button = %SettingsBtn
 @onready var settings_dialog: SettingsDialog = %SettingsDialog
+@onready var error_state: ErrorState = %ErrorState
 
 # --- DATA CONTROLLER ---
 @onready var project_manager: ProjectManager = %ProjectManager
@@ -42,6 +43,11 @@ var _is_restoring_view: bool = false
 func _ready() -> void:
 	_connect_signals()
 	
+	error_state.setup_requested.connect(func():
+		_show_welcome_screen()
+		error_state.hide()
+	)
+	
 	var saved_settings = project_manager.load_config()
 	if saved_settings.has("page_size"):
 		page_size = int(saved_settings["page_size"])
@@ -59,16 +65,49 @@ func _ready() -> void:
 	settings_dialog.settings_changed.connect(_on_settings_changed)
 	settings_dialog.library_path_changed.connect(_on_library_path_changed)
 	
-	if project_manager.is_fresh_install:
-		_show_welcome_screen()
-	else:
-		_scan_and_populate_projects()
+# 1. Critical Missing (No bootstrap, no default folder)
+	if project_manager.current_path_status == project_manager.PathStatus.BROKEN_MISSING:
+		# This shows the "Setup Data Path" button
+		_show_error_state()
+		
+		# CHANGE: If it's a fresh install, we might want to show the Welcome Screen AUTOMATICALLY
+		# but you prefer showing the "Setup Button" first.
+		# If you want the "Welcome Screen" to pop up automatically on first run, keep the line below.
+		# If you want to start with just the button, COMMENT OUT the _show_welcome_screen() line.
+		
+		if project_manager.is_fresh_install:
+			pass # Do nothing, let the _show_error_state() handle the UI
+			# _show_welcome_screen() # <--- Commented out based on your preference
+		
+		return 
+		
+	# 2. Custom Path Missing
+	if project_manager.current_path_status == project_manager.PathStatus.BROKEN_CUSTOM_FALLBACK:
+		_show_toast("⚠️ Custom path missing! Using default.")
+	
+	# 3. Normal Startup / Implicit Default Load
+	# If we are here, we have a valid _base_data_path (either from bootstrap or default fallback)
+	_scan_and_populate_projects()
 		
 	# Listen for resize logic
 	get_tree().root.size_changed.connect(_on_window_resized)
 	%ResizeTimer.timeout.connect(_update_ui)
 	%SearchTimer.timeout.connect(_perform_search)
 	get_tree().set_auto_accept_quit(false)
+	
+func _show_error_state() -> void:
+	column_headers.hide()
+	scroll_container.hide()
+	
+	# Update label text based on why we are here
+	var label = error_state.find_child("Label") # Assuming the label is named "Label" inside ErrorState
+	if label:
+		if project_manager.is_fresh_install:
+			label.text = "No Data Path Found!"
+		else:
+			label.text = "Data Path Not Found!\n(Did you move your folder?)"
+			
+	error_state.show()
 	
 func _open_settings() -> void:
 	settings_dialog.open(page_size, row_height, project_manager.autosave_enabled)
@@ -191,27 +230,30 @@ func _show_welcome_screen() -> void:
 	%ToastContainer.get_parent().add_child(welcome)
 	welcome.setup_completed.connect(_on_welcome_completed.bind(welcome))
 
-func _on_welcome_completed(selected_path: String, welcome_instance: Node) -> void:
-	# 1. Remove the screen
+func _on_welcome_completed(selected_path: String, is_portable: bool, welcome_instance: Node) -> void:
 	welcome_instance.queue_free()
 	
-	# 2. Handle the choice
 	if selected_path != "":
-		# User selected "Portable" or "Custom"
-		# This function in ProjectManager saves the bootstrap AND creates the folders
-		project_manager.update_library_path(selected_path)
+		# User chose a path
+		project_manager.update_library_path(selected_path, is_portable)
 		
-		# Since we just created it, it's technically no longer a "fresh install" state
-		# for the purpose of logic, though we don't strictly need to toggle the bool back.
+		# If we fixed the error, show the UI
+		if project_manager._base_data_path != "":
+			error_state.hide()
+			column_headers.show()
+			scroll_container.show()
+			_scan_and_populate_projects()
 	else:
-		# User selected "Skip"
-		# We do nothing. ProjectManager has a default path in memory, 
-		# but the folders on disk (likely) don't exist. 
-		# _scan_and_populate_projects will just find 0 projects.
-		pass
-
-	# 3. Finally, start the app
-	_scan_and_populate_projects()
+		# User clicked SKIP
+		
+		# 1. Check if we actually have a fallback path (e.g. Dev folder)
+		if project_manager._base_data_path != "" and project_manager.current_path_status == project_manager.PathStatus.OK:
+			# We have a path! Just load it.
+			_scan_and_populate_projects()
+		else:
+			# We have nothing. Show the "Setup" button (Error State).
+			# Do NOT relaunch welcome screen immediately.
+			_show_error_state()
 
 # --- FILE OPERATION HANDLERS ---
 

@@ -20,6 +20,8 @@ var _column_path_map: Dictionary = {}
 var datasets_root_path: String = ""
 var deleted_root_path: String = ""
 var _base_data_path: String = ""
+enum PathStatus { OK, BROKEN_MISSING, BROKEN_CUSTOM_FALLBACK }
+var current_path_status: PathStatus = PathStatus.OK
 
 const CONFIG_FILENAME = "dolina_dataset_config.json"
 
@@ -31,8 +33,9 @@ func _ready() -> void:
 # --- INITIALIZATION ---
 
 func _setup_paths() -> void:
-	# 1. Default to local path (Portable behavior)
-	# Note: In Editor, using local res:// is safer. In Export, use executable dir.
+	current_path_status = PathStatus.OK
+	
+	# 1. Calculate the "Default" (Portable) location relative to executable
 	var default_path = ""
 	if OS.has_feature("editor"):
 		default_path = ProjectSettings.globalize_path("res://examples/data")
@@ -41,60 +44,101 @@ func _setup_paths() -> void:
 		if OS.get_name() == "macOS" and default_path.contains(".app"):
 			default_path = OS.get_executable_path().get_base_dir().get_base_dir().get_base_dir().get_base_dir() + "/data"
 
-	# 2. Check for the Bootstrap Pointer
-	_base_data_path = _load_library_path_from_bootstrap(default_path)
-
-	# 3. Set sub-paths
-	datasets_root_path = _base_data_path + "/datasets"
-	deleted_root_path = _base_data_path + "/deleted_files"
-	
-	print("Data Library Loaded at: ", _base_data_path)
-
-func _load_library_path_from_bootstrap(default_val: String) -> String:
+# 2. Check for Bootstrap
 	if not FileAccess.file_exists(BOOTSTRAP_FILE):
+		# --- SCENARIO C: NO BOOTSTRAP (User Skipped or Fresh) ---
 		is_fresh_install = true
-		return default_val
 		
-	var f = FileAccess.open(BOOTSTRAP_FILE, FileAccess.READ)
-	var json = JSON.new()
-	var err = json.parse(f.get_as_text())
-	if err == OK and json.data is Dictionary:
-		var path = json.data.get("library_path", "")
-		# Verify the path actually exists (if user deleted the folder, revert to default)
-		if path != "" and DirAccess.dir_exists_absolute(path):
-			return path
+		if DirAccess.dir_exists_absolute(default_path):
+			# CASE 1: Default folder exists (e.g. Dev environment or unconfigured portable)
+			_base_data_path = default_path
+			# FIX: Explicitly say status is OK so Main knows to load it
+			current_path_status = PathStatus.OK 
+		else:
+			# CASE 2: No folder anywhere
+			_base_data_path = ""
+			current_path_status = PathStatus.BROKEN_MISSING
+	else:
+		# --- SCENARIO A & B: BOOTSTRAP EXISTS ---
+		var bootstrap_data = _read_bootstrap()
+		var stored_path = bootstrap_data.get("library_path", "")
+		var is_portable = bootstrap_data.get("is_portable", false)
+		
+		var stored_exists = DirAccess.dir_exists_absolute(stored_path)
+		var default_exists = DirAccess.dir_exists_absolute(default_path)
+		
+		if stored_exists:
+			# Case: All good
+			_base_data_path = stored_path
+		
+		else:
+			# Case: Stored path is missing!
 			
-	return default_val
+			if is_portable:
+				# SCENARIO A: Portable Mode Self-Healing
+				if default_exists:
+					# We moved the folder! Self-heal.
+					_base_data_path = default_path
+					print("Portable folder moved. Self-healing bootstrap...")
+					update_library_path(default_path, true) # Auto-update bootstrap
+				else:
+					# Both gone -> Critical Error
+					_base_data_path = ""
+					current_path_status = PathStatus.BROKEN_MISSING
+			
+			else:
+				# SCENARIO B: Custom Mode Failure
+				if default_exists:
+					# Fallback to default, but warn user
+					_base_data_path = default_path
+					current_path_status = PathStatus.BROKEN_CUSTOM_FALLBACK
+				else:
+					# Both gone -> Critical Error
+					_base_data_path = ""
+					current_path_status = PathStatus.BROKEN_MISSING
 
-# Call this when the user picks a new folder in Settings
-func update_library_path(new_path: String) -> void:
-	# 1. Save the pointer
-	var data = {"library_path": new_path}
+	# 3. Finalize
+	if _base_data_path != "":
+		datasets_root_path = _base_data_path + "/datasets"
+		deleted_root_path = _base_data_path + "/deleted_files"
+		print("Data Library Loaded at: ", _base_data_path)
+	else:
+		print("CRITICAL: No valid data path found.")
+
+func _read_bootstrap() -> Dictionary:
+	var f = FileAccess.open(BOOTSTRAP_FILE, FileAccess.READ)
+	if f:
+		var json = JSON.new()
+		if json.parse(f.get_as_text()) == OK:
+			return json.data
+	return {}
+
+# UPDATED: Now accepts is_portable flag
+func update_library_path(new_path: String, is_portable: bool = false) -> void:
+	# 1. Save the pointer AND the mode
+	var data = {
+		"library_path": new_path,
+		"is_portable": is_portable
+	}
 	var f = FileAccess.open(BOOTSTRAP_FILE, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(data))
 		f.close()
 	
-	# 2. We need to restart or re-init. 
-	# For simplicity, let's just update internal vars and ask Main to refresh.
-	# But moving the ACTUAL files is risky to do automatically.
-	# Let's assume the user points to an EMPTY folder or an EXISTING library.
-	
 	_base_data_path = new_path
 	datasets_root_path = _base_data_path + "/datasets"
 	deleted_root_path = _base_data_path + "/deleted_files"
 	
+	# If we are creating a new path, ensure folders exist
 	_initialize_library_structure()
 	
-	# Emit a signal so Main knows to reload everything
-	# We can reuse 'project_loaded' or make a new one. 
-	# Let's emit a toast and reload the project list.
 	toast_requested.emit("Library Path Updated!")
 	
-	# Reload current project state (will likely be empty if new folder)
+	# Reset state
 	current_project_name = ""
 	current_dataset.clear()
 	current_columns.clear()
+	current_path_status = PathStatus.OK # Reset error status if we just fixed it
 
 func _initialize_library_structure() -> void:
 	# DirAccess.make_dir_recursive_absolute is a static method. 

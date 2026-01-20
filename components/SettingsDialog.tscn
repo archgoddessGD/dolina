@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://c58bmeeukos2g"]
+[gd_scene load_steps=3 format=3 uid="uid://c58bmeeukos2g"]
 
 [ext_resource type="Script" uid="uid://fp3bk4fanucp" path="res://components/settings_dialog.gd" id="1_dtdv5"]
+[ext_resource type="Theme" uid="uid://duyeylfni0bvn" path="res://assets/DolinaTheme.tres" id="2_k2t7h"]
 
 [node name="SettingsDialog" type="AcceptDialog"]
 title = "Settings"
@@ -46,7 +47,8 @@ Autosave"
 [node name="AutosaveCheck" type="CheckBox" parent="VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Enable Autosave"
+theme = ExtResource("2_k2t7h")
+text = "Enable Text Autosave"
 
 [node name="LabelsPathSave" type="Label" parent="VBoxContainer"]
 layout_mode = 2
