@@ -24,6 +24,7 @@ const WelcomeScene = preload("res://components/WelcomeScreen.tscn")
 @onready var settings_btn: Button = %SettingsBtn
 @onready var settings_dialog: SettingsDialog = %SettingsDialog
 @onready var error_state: ErrorState = %ErrorState
+@onready var empty_state: EmptyState = %EmptyState
 
 # --- DATA CONTROLLER ---
 @onready var project_manager: ProjectManager = %ProjectManager
@@ -46,6 +47,13 @@ func _ready() -> void:
 	error_state.setup_requested.connect(func():
 		_show_welcome_screen()
 		error_state.hide()
+	)
+	
+	empty_state.examples_imported.connect(func():
+		# When download finishes, hide the empty screen and refresh projects
+		empty_state.hide()
+		_scan_and_populate_projects()
+		_show_toast("Examples Loaded!")
 	)
 	
 	var saved_settings = project_manager.load_config()
@@ -154,19 +162,32 @@ func _connect_signals() -> void:
 # --- PROJECT LOGIC ---
 
 func _scan_and_populate_projects() -> void:
-	# 1. Capture current state before we wipe it
 	var prev_project = project_manager.current_project_name
 	
-	# 2. Scan
 	project_select.clear()
 	var projects = project_manager.scan_projects()
 	
+	# --- NEW LOGIC HERE ---
 	if projects.is_empty():
+		# 1. Hide normal UI
+		column_headers.hide()
+		scroll_container.hide()
+		
+		# 2. Setup and Show Empty State
+		empty_state.setup(project_manager.datasets_root_path)
+		empty_state.show()
+		
+		# 3. Handle Select Button
 		project_select.add_item("No Projects Found")
 		project_select.disabled = true
 		return
+	else:
+		# If projects exist, ensure EmptyState is hidden and Grid is visible
+		empty_state.hide()
+		column_headers.show()
+		scroll_container.show()
+	# ----------------------
 
-	# 3. Populate & Search for previous project
 	project_select.disabled = false
 	var target_index = 0
 	var found_prev = false

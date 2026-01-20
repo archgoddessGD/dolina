@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://cqyl562ctjiib"]
+[gd_scene load_steps=11 format=3 uid="uid://cqyl562ctjiib"]
 
 [ext_resource type="Theme" uid="uid://duyeylfni0bvn" path="res://assets/DolinaTheme.tres" id="1_cmtxc"]
 [ext_resource type="Script" uid="uid://badu0bax2jj71" path="res://main/main.gd" id="1_qv31u"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" uid="uid://c58bmeeukos2g" path="res://components/SettingsDialog.tscn" id="4_o80qs"]
 [ext_resource type="PackedScene" uid="uid://bbg3jlrsky0hd" path="res://components/ErrorState.tscn" id="5_bg6xb"]
 [ext_resource type="PackedScene" uid="uid://bqpxyt5nyhpav" path="res://components/SafetyDialog.tscn" id="5_tv7ag"]
+[ext_resource type="PackedScene" uid="uid://cmjv3d01bnurn" path="res://components/EmptyState.tscn" id="6_7a1mn"]
 [ext_resource type="Script" uid="uid://ck0mkthqv2w5j" path="res://scripts/project_manager.gd" id="6_qtrhv"]
 
 [node name="Main" type="Control"]
@@ -133,6 +134,11 @@ size_flags_horizontal = 3
 mouse_filter = 2
 
 [node name="ErrorState" parent="MarginContainer" instance=ExtResource("5_bg6xb")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="EmptyState" parent="MarginContainer" instance=ExtResource("6_7a1mn")]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2

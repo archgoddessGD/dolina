@@ -11,6 +11,7 @@ layout_mode = 2
 [node name="Label" type="Label" parent="VBoxContainer"]
 layout_mode = 2
 text = "No Data Path Found!"
+horizontal_alignment = 1
 
 [node name="SetupBtn" type="Button" parent="VBoxContainer"]
 unique_name_in_owner = true
