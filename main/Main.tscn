@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://cqyl562ctjiib"]
+[gd_scene load_steps=12 format=3 uid="uid://cqyl562ctjiib"]
 
 [ext_resource type="Theme" uid="uid://duyeylfni0bvn" path="res://assets/DolinaTheme.tres" id="1_cmtxc"]
 [ext_resource type="Script" uid="uid://badu0bax2jj71" path="res://main/main.gd" id="1_qv31u"]
@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" uid="uid://bqpxyt5nyhpav" path="res://components/SafetyDialog.tscn" id="5_tv7ag"]
 [ext_resource type="PackedScene" uid="uid://cmjv3d01bnurn" path="res://components/EmptyState.tscn" id="6_7a1mn"]
 [ext_resource type="Script" uid="uid://ck0mkthqv2w5j" path="res://scripts/project_manager.gd" id="6_qtrhv"]
+[ext_resource type="PackedScene" uid="uid://dt7qh2itdwrcl" path="res://components/TextEditor.tscn" id="9_m4geg"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -143,6 +144,40 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 
+[node name="UploadDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+title = "Open a File"
+file_mode = 0
+access = 2
+
+[node name="SettingsDialog" parent="." instance=ExtResource("4_o80qs")]
+unique_name_in_owner = true
+
+[node name="ImageViewer" parent="." instance=ExtResource("2_wbnyf")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="TextEditor" parent="." instance=ExtResource("9_m4geg")]
+unique_name_in_owner = true
+layout_mode = 1
+
+[node name="SafetyDialog" parent="." instance=ExtResource("5_tv7ag")]
+unique_name_in_owner = true
+
+[node name="ResizeTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 0.25
+one_shot = true
+
+[node name="SearchTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 0.3
+one_shot = true
+
+[node name="ProjectManager" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("6_qtrhv")
+
 [node name="ToastLayer" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
@@ -163,33 +198,3 @@ offset_bottom = 10.0
 grow_horizontal = 2
 mouse_filter = 2
 theme_override_constants/separation = 10
-
-[node name="UploadDialog" type="FileDialog" parent="."]
-unique_name_in_owner = true
-title = "Open a File"
-file_mode = 0
-access = 2
-
-[node name="SettingsDialog" parent="." instance=ExtResource("4_o80qs")]
-unique_name_in_owner = true
-
-[node name="ImageViewer" parent="." instance=ExtResource("2_wbnyf")]
-unique_name_in_owner = true
-layout_mode = 1
-
-[node name="SafetyDialog" parent="." instance=ExtResource("5_tv7ag")]
-unique_name_in_owner = true
-
-[node name="ResizeTimer" type="Timer" parent="."]
-unique_name_in_owner = true
-wait_time = 0.25
-one_shot = true
-
-[node name="SearchTimer" type="Timer" parent="."]
-unique_name_in_owner = true
-wait_time = 0.3
-one_shot = true
-
-[node name="ProjectManager" type="Node" parent="."]
-unique_name_in_owner = true
-script = ExtResource("6_qtrhv")

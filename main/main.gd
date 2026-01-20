@@ -25,6 +25,7 @@ const WelcomeScene = preload("res://components/WelcomeScreen.tscn")
 @onready var settings_dialog: SettingsDialog = %SettingsDialog
 @onready var error_state: ErrorState = %ErrorState
 @onready var empty_state: EmptyState = %EmptyState
+@onready var text_editor: TextEditor = %TextEditor
 
 # --- DATA CONTROLLER ---
 @onready var project_manager: ProjectManager = %ProjectManager
@@ -50,7 +51,6 @@ func _ready() -> void:
 	)
 	
 	empty_state.examples_imported.connect(func():
-		# When download finishes, hide the empty screen and refresh projects
 		empty_state.hide()
 		_scan_and_populate_projects()
 		_show_toast("Examples Loaded!")
@@ -73,28 +73,28 @@ func _ready() -> void:
 	settings_dialog.settings_changed.connect(_on_settings_changed)
 	settings_dialog.library_path_changed.connect(_on_library_path_changed)
 	
-# 1. Critical Missing (No bootstrap, no default folder)
+	# Connect the Expanded Editor Save to our main save handler
+	text_editor.request_save.connect(_handle_save_text)
+	
+	# When editor closes, refresh the grid so the small text box updates
+	text_editor.closed.connect(func():
+		_render_grid() 
+	)
+	
+	# 1. Critical Missing (No bootstrap, no default folder)
 	if project_manager.current_path_status == project_manager.PathStatus.BROKEN_MISSING:
-		# This shows the "Setup Data Path" button
 		_show_error_state()
 		
-		# CHANGE: If it's a fresh install, we might want to show the Welcome Screen AUTOMATICALLY
-		# but you prefer showing the "Setup Button" first.
-		# If you want the "Welcome Screen" to pop up automatically on first run, keep the line below.
-		# If you want to start with just the button, COMMENT OUT the _show_welcome_screen() line.
-		
 		if project_manager.is_fresh_install:
-			pass # Do nothing, let the _show_error_state() handle the UI
-			# _show_welcome_screen() # <--- Commented out based on your preference
-		
+			pass 
+
 		return 
 		
 	# 2. Custom Path Missing
 	if project_manager.current_path_status == project_manager.PathStatus.BROKEN_CUSTOM_FALLBACK:
 		_show_toast("⚠️ Custom path missing! Using default.")
 	
-	# 3. Normal Startup / Implicit Default Load
-	# If we are here, we have a valid _base_data_path (either from bootstrap or default fallback)
+	# 3. Normal Startup
 	_scan_and_populate_projects()
 		
 	# Listen for resize logic
@@ -443,7 +443,7 @@ func _update_ui() -> void:
 		
 		# 2. Fill Button
 		var flash_btn = Button.new()
-		flash_btn.text = "📄" 
+		flash_btn.text = "📄"
 		flash_btn.tooltip_text = "Bulk populate empty rows in this column with .txt files" 
 		flash_btn.focus_mode = Control.FOCUS_NONE
 		flash_btn.flat = true
@@ -509,6 +509,9 @@ func _render_grid(col_width: float = -1.0) -> void:
 		row_instance.request_create_txt.connect(_handle_create_txt)
 		row_instance.request_delete_file.connect(_handle_delete_file)
 		row_instance.request_save_text.connect(_handle_save_text)
+		row_instance.request_expanded_text.connect(func(path, content):
+			text_editor.open(path, content, project_manager.autosave_enabled)
+		)
 		row_instance.request_upload.connect(_handle_request_upload)
 		row_instance.request_direct_upload.connect(_handle_direct_upload)
 		

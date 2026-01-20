@@ -3,6 +3,7 @@ extends HBoxContainer
 
 # --- SIGNALS ---
 signal request_full_image(stem: String, path: String)
+signal request_expanded_text(path: String, content: String)
 signal request_delete_file(path: String)
 signal request_create_txt(stem: String, column: String)
 signal request_save_text(path: String, new_content: String)
@@ -302,6 +303,17 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 			flash_success.call() 
 		)
 		
+		var expand_btn = Button.new()
+		expand_btn.text = "⤢"
+		expand_btn.tooltip_text = "Expand Editor"
+		expand_btn.pressed.connect(func():
+		# Stop local autosave to avoid conflicts/double saving
+			if autosave_timer: autosave_timer.stop()
+			# Send current text up to Main
+			emit_signal("request_expanded_text", file_path, text_edit.text)
+		)
+		
+		sidebar.add_child(expand_btn)
 		sidebar.add_child(save_btn)
 		sidebar.add_child(HSeparator.new())
 		sidebar.add_child(del_btn)

@@ -1,0 +1,60 @@
+[gd_scene load_steps=2 format=3 uid="uid://dt7qh2itdwrcl"]
+
+[ext_resource type="Script" uid="uid://b4mi5adjbxqnm" path="res://components/text_editor.gd" id="1_hf108"]
+
+[node name="TextEditor" type="ColorRect"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.78431374)
+script = ExtResource("1_hf108")
+
+[node name="Sheet" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.28
+anchor_top = 0.01
+anchor_right = 0.72
+anchor_bottom = 0.99
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Sheet"]
+layout_mode = 2
+
+[node name="Toolbar" type="HBoxContainer" parent="Sheet/VBoxContainer"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="Sheet/VBoxContainer/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "filename.txt"
+
+[node name="VSeparator" type="VSeparator" parent="Sheet/VBoxContainer/Toolbar"]
+layout_mode = 2
+
+[node name="SaveBtn" type="Button" parent="Sheet/VBoxContainer/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "💾 Save"
+
+[node name="CloseBtn" type="Button" parent="Sheet/VBoxContainer/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "❌ Close"
+
+[node name="Editor" type="CodeEdit" parent="Sheet/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 20
+wrap_mode = 1
+
+[node name="Footer" type="HBoxContainer" parent="Sheet/VBoxContainer"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="Sheet/VBoxContainer/Footer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.54901963)
+text = "Ready"
