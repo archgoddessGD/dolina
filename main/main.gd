@@ -45,6 +45,7 @@ var _is_restoring_view: bool = false
 func _ready() -> void:
 	_connect_signals()
 	
+	# Setup UI connections
 	error_state.setup_requested.connect(func():
 		_show_welcome_screen()
 		error_state.hide()
@@ -73,32 +74,29 @@ func _ready() -> void:
 	settings_dialog.settings_changed.connect(_on_settings_changed)
 	settings_dialog.library_path_changed.connect(_on_library_path_changed)
 	
-	# Connect the Expanded Editor Save to our main save handler
+	# --- TEXT EDITOR CONNECTIONS ---
+	
+	# 1. Connect Save
 	text_editor.request_save.connect(_handle_save_text)
 	
+	# 2. Connect Smart Update (The Fix)
+	# This lambda correctly accepts the two arguments sent by the signal
 	text_editor.closed.connect(func(path, new_content):
-		# Extract the stem (e.g., "apple" from "apple.txt")
 		var stem = path.get_file().get_basename()
 		
-		# Look for the visible row with that stem
 		for child in row_container.get_children():
 			if child is Row and child.stem == stem:
 				child.update_text_cell(path, new_content)
 				break
 	)
 	
-	# When editor closes, refresh the grid so the small text box updates
-	text_editor.closed.connect(func():
-		_render_grid() 
-	)
+	# --- STARTUP LOGIC ---
 	
 	# 1. Critical Missing (No bootstrap, no default folder)
 	if project_manager.current_path_status == project_manager.PathStatus.BROKEN_MISSING:
 		_show_error_state()
-		
 		if project_manager.is_fresh_install:
 			pass 
-
 		return 
 		
 	# 2. Custom Path Missing

@@ -1,6 +1,22 @@
-[gd_scene load_steps=2 format=3 uid="uid://dt7qh2itdwrcl"]
+[gd_scene load_steps=3 format=3 uid="uid://dt7qh2itdwrcl"]
 
 [ext_resource type="Script" uid="uid://b4mi5adjbxqnm" path="res://components/text_editor.gd" id="1_hf108"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hf108"]
+content_margin_left = 9.0
+content_margin_top = 6.0
+content_margin_right = 9.0
+content_margin_bottom = 6.0
+bg_color = Color(0.02745098, 0.078431375, 0.05490196, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.1764706, 0.23137255, 0.20392157, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [node name="TextEditor" type="ColorRect"]
 anchors_preset = 15
@@ -14,10 +30,11 @@ script = ExtResource("1_hf108")
 [node name="Sheet" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.28
+anchor_left = 0.27
 anchor_top = 0.01
-anchor_right = 0.72
+anchor_right = 0.73
 anchor_bottom = 0.99
+theme_override_styles/panel = SubResource("StyleBoxFlat_hf108")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Sheet"]
 layout_mode = 2
@@ -61,7 +78,7 @@ text = "❌ Close"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 21
 wrap_mode = 1
 
 [node name="SearchPanel" type="PanelContainer" parent="Sheet/VBoxContainer"]

@@ -65,7 +65,11 @@ func _ready() -> void:
 	close_search_btn.pressed.connect(_close_search)
 	find_next_btn.pressed.connect(_find_next)
 	find_prev_btn.pressed.connect(_find_prev)
-	find_input.text_submitted.connect(func(_text): _find_next())
+	find_input.gui_input.connect(func(event):
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ENTER:
+			_find_next()
+			find_input.accept_event() # Stops the event so LineEdit doesn't "submit" and lose focus
+	)
 	replace_one_btn.pressed.connect(_replace_one)
 	replace_all_btn.pressed.connect(_replace_all)
 
@@ -110,10 +114,21 @@ func _on_autosave_trigger() -> void:
 
 func _perform_save(success_msg: String) -> void:
 	request_save.emit(_current_path, editor.text)
+	
+	# 1. Flash the Status Label (Existing logic, slower fade)
 	status_label.text = success_msg
 	status_label.modulate = Color("41f095")
-	var tween = create_tween()
-	tween.tween_property(status_label, "modulate", Color(1,1,1,0.7), 1.5)
+	var label_tween = create_tween()
+	label_tween.tween_property(status_label, "modulate", Color(1,1,1,0.7), 1.5)
+	
+	# 2. Flash the Editor (Matches row.gd logic)
+	# This flashes the entire text area and text green instantly
+	var original_modulate = Color(1, 1, 1, 1)
+	editor.modulate = Color(0.5, 1.0, 0.5)
+	
+	var editor_tween = create_tween()
+	# Snap back to white over 0.3 seconds
+	editor_tween.tween_property(editor, "modulate", original_modulate, 0.3)
 
 func _close() -> void:
 	if not _autosave_timer.is_stopped():
