@@ -9,19 +9,13 @@ const ToastScene = preload("res://components/Toast.tscn")
 const WelcomeScene = preload("res://components/WelcomeScreen.tscn")
 
 # --- UI NODES ---
-@onready var project_select: OptionButton = %ProjectSelect
+@onready var header: Header = %Header
 @onready var row_container: VBoxContainer = %RowContainer
 @onready var column_headers: HBoxContainer = $MarginContainer/VBox/ColumnHeaders
-@onready var prev_btn: Button = %PrevBtn
-@onready var page_input: LineEdit = %PageInput
-@onready var total_label: Label = %TotalLabel
-@onready var next_btn: Button = %NextBtn
-@onready var refresh_btn: Button = $MarginContainer/VBox/Header/RefreshBtn
 @onready var upload_dialog: FileDialog = %UploadDialog
 @onready var safety_dialog: SafetyDialog = %SafetyDialog
 @onready var scroll_container: ScrollContainer = $MarginContainer/VBox/ScrollContainer
 @onready var background: ColorRect = $Background
-@onready var settings_btn: Button = %SettingsBtn
 @onready var settings_dialog: SettingsDialog = %SettingsDialog
 @onready var error_state: ErrorState = %ErrorState
 @onready var empty_state: EmptyState = %EmptyState
@@ -58,6 +52,15 @@ func _ready() -> void:
 		_show_toast("Examples Loaded!")
 	)
 	
+	# We listen to the Header's "events", not the individual buttons
+	header.project_selected.connect(_on_project_selected)
+	header.refresh_requested.connect(_scan_and_populate_projects)
+	header.settings_requested.connect(_open_settings)
+	
+	# Pagination signals
+	header.page_change_requested.connect(_change_page)
+	header.page_jump_requested.connect(_on_page_jump_requested)
+	
 	var saved_settings = project_manager.load_config()
 	if saved_settings.has("page_size"):
 		page_size = int(saved_settings["page_size"])
@@ -71,7 +74,6 @@ func _ready() -> void:
 	# Wait for layout
 	await get_tree().process_frame
 	
-	settings_btn.pressed.connect(_open_settings)
 	settings_dialog.settings_changed.connect(_on_settings_changed)
 	settings_dialog.library_path_changed.connect(_on_library_path_changed)
 	
@@ -155,13 +157,6 @@ func _on_library_path_changed(new_path: String) -> void:
 	_scan_and_populate_projects()
 	
 func _connect_signals() -> void:
-	# UI Signals
-	project_select.item_selected.connect(_on_project_selected)
-	refresh_btn.pressed.connect(_scan_and_populate_projects)
-	prev_btn.pressed.connect(_change_page.bind(-1))
-	next_btn.pressed.connect(_change_page.bind(1))
-	page_input.text_submitted.connect(_on_page_jump_submitted)
-	page_input.focus_exited.connect(_update_pagination_labels)
 	upload_dialog.file_selected.connect(_on_file_uploaded)
 	
 	# Project Manager Signals
@@ -173,58 +168,38 @@ func _connect_signals() -> void:
 
 func _scan_and_populate_projects() -> void:
 	var prev_project = project_manager.current_project_name
-	
-	project_select.clear()
 	var projects = project_manager.scan_projects()
 	
-	# --- NEW LOGIC HERE ---
+	# 1. Let the header update its own UI
+	header.populate_projects(projects, prev_project)
+	
+	# 2. Handle Logic (Empty State vs Grid)
 	if projects.is_empty():
-		# 1. Hide normal UI
 		column_headers.hide()
 		scroll_container.hide()
-		
-		# 2. Setup and Show Empty State
 		empty_state.setup(project_manager.datasets_root_path)
 		empty_state.show()
-		
-		# 3. Handle Select Button
-		project_select.add_item("No Projects Found")
-		project_select.disabled = true
 		return
 	else:
-		# If projects exist, ensure EmptyState is hidden and Grid is visible
 		empty_state.hide()
 		column_headers.show()
 		scroll_container.show()
-	# ----------------------
 
-	project_select.disabled = false
-	var target_index = 0
-	var found_prev = false
+	# 3. Determine which project to load (Logic remains mostly the same)
+	# We ask the header "What name is currently selected?" to verify
+	var selected_name = header.get_selected_project_name()
 	
-	for i in range(projects.size()):
-		var proj = projects[i]
-		project_select.add_item(proj)
-		if proj == prev_project:
-			target_index = i
-			found_prev = true
-	
-	# 4. Select the correct item visually
-	project_select.selected = target_index
-	
-	# 5. Load
-	if found_prev:
-		# We found our old project! Set the flag so we don't reset the page.
+	if selected_name == prev_project:
 		_is_restoring_view = true
-		project_manager.load_project(projects[target_index])
+		project_manager.load_project(selected_name)
 	else:
-		# It's a new project (or the old one was deleted). Reset everything.
 		_is_restoring_view = false
-		project_manager.load_project(projects[target_index])
+		project_manager.load_project(selected_name)
 
-func _on_project_selected(index: int) -> void:
-	var project_name = project_select.get_item_text(index)
-	project_manager.load_project(project_name)
+func _on_project_selected(_index: int) -> void:
+	var project_name = header.get_selected_project_name()
+	if project_name != "":
+		project_manager.load_project(project_name)
 
 func _on_project_data_loaded() -> void:
 	if _is_restoring_view:
@@ -601,24 +576,18 @@ func _change_page(direction: int) -> void:
 		_update_pagination_labels()
 		_render_grid()
 
-func _on_page_jump_submitted(new_text: String) -> void:
-	if not new_text.is_valid_int():
-		_update_pagination_labels()
-		return
-	var target_page = int(new_text)
+func _on_page_jump_requested(target_page: int) -> void:
+	# Clamp the value (Header might have passed a raw number)
 	if target_page < 1: target_page = 1
 	elif target_page > total_pages: target_page = total_pages
+	
 	if target_page != current_page:
 		current_page = target_page
 		_render_grid()
 		_update_pagination_labels()
-	page_input.release_focus()
 
 func _update_pagination_labels() -> void:
-	page_input.text = str(current_page)
-	total_label.text = "/ %d" % total_pages
-	prev_btn.disabled = (current_page == 1)
-	next_btn.disabled = (current_page == total_pages)
+	header.update_pagination(current_page, total_pages)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if %ImageViewer.visible: return

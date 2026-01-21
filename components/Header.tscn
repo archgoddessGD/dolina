@@ -1,0 +1,86 @@
+[gd_scene load_steps=5 format=3 uid="uid://dfof23axx54tq"]
+
+[ext_resource type="Texture2D" uid="uid://yp7p7sxvjkta" path="res://assets/dolina_logo.svg" id="1_ceos5"]
+[ext_resource type="Script" uid="uid://b1qqobdit3fnk" path="res://components/header.gd" id="1_jo6jo"]
+[ext_resource type="Texture2D" uid="uid://bqlw5t28osebh" path="res://assets/settings_icon.svg" id="2_jo6jo"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_jo6jo"]
+
+[node name="Header" type="PanelContainer"]
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxEmpty_jo6jo")
+script = ExtResource("1_jo6jo")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="HBox" type="HBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 9
+
+[node name="Logo" type="TextureRect" parent="MarginContainer/HBox"]
+custom_minimum_size = Vector2(124, 46)
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("1_ceos5")
+expand_mode = 2
+stretch_mode = 5
+
+[node name="VSeparator" type="VSeparator" parent="MarginContainer/HBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ProjectSelect" type="OptionButton" parent="MarginContainer/HBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="RefreshBtn" type="Button" parent="MarginContainer/HBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "Refresh ↻"
+
+[node name="MiddleExpandSpacer" type="Control" parent="MarginContainer/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="TopRightHBox" type="HBoxContainer" parent="MarginContainer/HBox"]
+layout_mode = 2
+
+[node name="PaginationPanel" type="PanelContainer" parent="MarginContainer/HBox/TopRightHBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PaginationHBox" type="HBoxContainer" parent="MarginContainer/HBox/TopRightHBox/PaginationPanel"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PrevBtn" type="Button" parent="MarginContainer/HBox/TopRightHBox/PaginationPanel/PaginationHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "◀"
+
+[node name="PageInput" type="LineEdit" parent="MarginContainer/HBox/TopRightHBox/PaginationPanel/PaginationHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+
+[node name="TotalLabel" type="Label" parent="MarginContainer/HBox/TopRightHBox/PaginationPanel/PaginationHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "/ 1"
+
+[node name="NextBtn" type="Button" parent="MarginContainer/HBox/TopRightHBox/PaginationPanel/PaginationHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "▶"
+
+[node name="SettingsBtn" type="Button" parent="MarginContainer/HBox/TopRightHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+icon = ExtResource("2_jo6jo")
