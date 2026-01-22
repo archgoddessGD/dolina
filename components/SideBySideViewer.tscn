@@ -1,6 +1,22 @@
-[gd_scene load_steps=2 format=3 uid="uid://c8oodc6xy0j4g"]
+[gd_scene load_steps=3 format=3 uid="uid://c8oodc6xy0j4g"]
 
 [ext_resource type="Script" uid="uid://dtfltgdm6e8ri" path="res://components/side_by_side_viewer.gd" id="1_77cni"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_77cni"]
+content_margin_left = 9.0
+content_margin_top = 6.0
+content_margin_right = 9.0
+content_margin_bottom = 6.0
+bg_color = Color(0.02745098, 0.078431375, 0.05490196, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.1764706, 0.23137255, 0.20392157, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [node name="SideBySideViewer" type="ColorRect"]
 anchors_preset = 15
@@ -18,16 +34,19 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 20
+theme_override_constants/margin_top = 7
 theme_override_constants/margin_right = 20
-theme_override_constants/margin_bottom = 60
+theme_override_constants/margin_bottom = 20
 
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
 layout_mode = 2
+mouse_filter = 2
 
 [node name="TopBar" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
+mouse_filter = 2
 
 [node name="TitleLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar"]
 layout_mode = 2
@@ -35,6 +54,35 @@ layout_mode = 2
 [node name="Spacer" type="Control" parent="MarginContainer/VBoxContainer/TopBar"]
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="NavPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/TopBar"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/TopBar/NavPanel"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BtnPrevRow" type="Button" parent="MarginContainer/VBoxContainer/TopBar/NavPanel/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "▲"
+
+[node name="PositionLabel" type="Label" parent="MarginContainer/VBoxContainer/TopBar/NavPanel/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "1 / 100"
+
+[node name="BtnNextRow" type="Button" parent="MarginContainer/VBoxContainer/TopBar/NavPanel/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "▼"
+
+[node name="Spacer2" type="Control" parent="MarginContainer/VBoxContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
 
 [node name="CloseBtn" type="Button" parent="MarginContainer/VBoxContainer/TopBar"]
 layout_mode = 2
@@ -43,6 +91,7 @@ text = "❌ Close"
 [node name="SplitView" type="HSplitContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
+mouse_filter = 0
 
 [node name="LeftPanel" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SplitView"]
 layout_mode = 2
@@ -62,16 +111,91 @@ layout_mode = 2
 clip_contents = true
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_77cni")
 
 [node name="ImageRect" type="TextureRect" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer"]
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="TextEdit" type="CodeEdit" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer"]
+[node name="TextWrapper" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer"]
+layout_mode = 2
+
+[node name="Toolbar" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper"]
+layout_mode = 2
+
+[node name="Spacer" type="Control" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/Toolbar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SaveBtn" type="Button" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/Toolbar"]
+layout_mode = 2
+text = "💾 Save"
+
+[node name="SearchBtn" type="Button" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/Toolbar"]
+layout_mode = 2
+text = "Search"
+
+[node name="ReplaceBtn" type="Button" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/Toolbar"]
+layout_mode = 2
+text = "Replace"
+
+[node name="TextEdit" type="CodeEdit" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 21
+wrap_mode = 1
+
+[node name="SearchPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper"]
 visible = false
 layout_mode = 2
-wrap_mode = 1
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel"]
+layout_mode = 2
+
+[node name="FindBar" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="FindInput" type="LineEdit" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/FindBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Search..."
+
+[node name="FindPrev" type="Button" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/FindBar"]
+layout_mode = 2
+text = "▲"
+
+[node name="FindNext" type="Button" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/FindBar"]
+layout_mode = 2
+text = "▼"
+
+[node name="CloseSearch" type="Button" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/FindBar"]
+layout_mode = 2
+text = "X"
+
+[node name="ReplaceBar" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ReplaceInput" type="LineEdit" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/ReplaceBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Replace with..."
+
+[node name="ReplaceOne" type="Button" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/ReplaceBar"]
+layout_mode = 2
+text = "Replace"
+
+[node name="ReplaceAll" type="Button" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/ReplaceBar"]
+layout_mode = 2
+text = "Replace All"
+
+[node name="Footer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper/Footer"]
+layout_mode = 2
+text = "Ready"
+vertical_alignment = 1
 
 [node name="RightPanel" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SplitView"]
 layout_mode = 2
@@ -91,45 +215,87 @@ layout_mode = 2
 clip_contents = true
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_77cni")
 
 [node name="ImageRect" type="TextureRect" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer"]
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="TextEdit" type="CodeEdit" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer"]
-visible = false
+[node name="TextWrapper" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer"]
 layout_mode = 2
+
+[node name="Toolbar" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper"]
+layout_mode = 2
+
+[node name="Spacer" type="Control" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/Toolbar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SaveBtn" type="Button" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/Toolbar"]
+layout_mode = 2
+text = "💾 Save"
+
+[node name="SearchBtn" type="Button" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/Toolbar"]
+layout_mode = 2
+text = "Search"
+
+[node name="ReplaceBtn" type="Button" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/Toolbar"]
+layout_mode = 2
+text = "Replace"
+
+[node name="TextEdit" type="CodeEdit" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 21
 wrap_mode = 1
 
-[node name="NavPanel" type="PanelContainer" parent="."]
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = 30.0
-offset_top = -71.0
-offset_right = 126.0
-offset_bottom = -40.0
-grow_horizontal = 2
-grow_vertical = 0
-
-[node name="HBoxContainer" type="HBoxContainer" parent="NavPanel"]
+[node name="SearchPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper"]
+visible = false
 layout_mode = 2
 
-[node name="BtnPrevRow" type="Button" parent="NavPanel/HBoxContainer"]
-unique_name_in_owner = true
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel"]
+layout_mode = 2
+
+[node name="FindBar" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="FindInput" type="LineEdit" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/FindBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Search..."
+
+[node name="FindPrev" type="Button" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/FindBar"]
 layout_mode = 2
 text = "▲"
 
-[node name="PositionLabel" type="Label" parent="NavPanel/HBoxContainer"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "1 / 100"
-
-[node name="BtnNextRow" type="Button" parent="NavPanel/HBoxContainer"]
-unique_name_in_owner = true
+[node name="FindNext" type="Button" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/FindBar"]
 layout_mode = 2
 text = "▼"
+
+[node name="CloseSearch" type="Button" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/FindBar"]
+layout_mode = 2
+text = "X"
+
+[node name="ReplaceBar" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer"]
+layout_mode = 2
+
+[node name="ReplaceInput" type="LineEdit" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/ReplaceBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Replace with..."
+
+[node name="ReplaceOne" type="Button" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/ReplaceBar"]
+layout_mode = 2
+text = "Replace"
+
+[node name="ReplaceAll" type="Button" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/SearchPanel/VBoxContainer/ReplaceBar"]
+layout_mode = 2
+text = "Replace All"
+
+[node name="Footer" type="HBoxContainer" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper"]
+layout_mode = 2
+
+[node name="StatusLabel" type="Label" parent="MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper/Footer"]
+layout_mode = 2
+text = "Ready"

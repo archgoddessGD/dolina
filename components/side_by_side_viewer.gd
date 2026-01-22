@@ -8,26 +8,27 @@ signal closed
 # --- NODES ---
 @onready var close_btn: Button = $MarginContainer/VBoxContainer/TopBar/CloseBtn
 
-# Left Panel
+# Left Side UI
 @onready var col_select_left: OptionButton = %ColSelectLeft
 @onready var img_left: TextureRect = $MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/ImageRect
-@onready var txt_left: CodeEdit = $MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextEdit
+@onready var text_wrapper_left: VBoxContainer = $MarginContainer/VBoxContainer/SplitView/LeftPanel/ContentContainer/TextWrapper
 
-# Right Panel
+# Right Side UI
 @onready var col_select_right: OptionButton = %ColSelectRight
 @onready var img_right: TextureRect = $MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/ImageRect
-@onready var txt_right: CodeEdit = $MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextEdit
+@onready var text_wrapper_right: VBoxContainer = $MarginContainer/VBoxContainer/SplitView/RightPanel/ContentContainer/TextWrapper
 
 # Nav
 @onready var btn_prev_row: Button = %BtnPrevRow
 @onready var btn_next_row: Button = %BtnNextRow
 @onready var position_label: Label = %PositionLabel
 
+# Used for Click-Off detection (The actual visual UI box)
+@onready var ui_box: VBoxContainer = $MarginContainer/VBoxContainer
+
 # --- ASSETS ---
 const CURSOR_MAGNIFIER = preload("res://assets/magnifying_glass.svg")
 const CURSOR_HOTSPOT = Vector2(21, 21)
-
-# --- SETTINGS ---
 const ZOOM_LEVEL: float = 3.0
 const DRAG_THRESHOLD: float = 5.0
 
@@ -37,6 +38,10 @@ var _stems: Array = []
 var _current_index: int = 0
 var _columns: Array[String] = []
 
+# Helpers
+var _left_controller: TextController
+var _right_controller: TextController
+
 # Zoom/Pan State
 var _dragging_left: bool = false
 var _dragging_right: bool = false
@@ -44,32 +49,274 @@ var _drag_start_mouse_pos: Vector2
 var _drag_start_img_pos: Vector2
 var _has_dragged_significantly: bool = false
 
+# --- INNER CLASS: HANDLES TEXT LOGIC ---
+class TextController:
+	var wrapper: VBoxContainer
+	var editor: CodeEdit
+	var search_panel: PanelContainer
+	var status_label: Label
+	
+	# Toolbar
+	var btn_save: Button
+	var btn_search: Button
+	var btn_replace: Button
+	
+	# Search UI
+	var input_find: LineEdit
+	var input_replace: LineEdit
+	var btn_next: Button
+	var btn_prev: Button
+	var btn_rep_one: Button
+	var btn_rep_all: Button
+	var btn_close_search: Button
+	var replace_bar: Control
+	
+	var parent_viewer: SideBySideViewer
+	var autosave_timer: Timer
+	
+	func _init(_wrapper: VBoxContainer, _viewer: SideBySideViewer):
+		wrapper = _wrapper
+		parent_viewer = _viewer
+		
+		# Locate Nodes
+		editor = wrapper.get_node("TextEdit")
+		search_panel = wrapper.get_node("SearchPanel")
+		status_label = wrapper.get_node("Footer/StatusLabel")
+		
+		var toolbar = wrapper.get_node("Toolbar")
+		btn_save = toolbar.get_node("SaveBtn")
+		btn_search = toolbar.get_node("SearchBtn")
+		btn_replace = toolbar.get_node("ReplaceBtn")
+		
+		var search_vbox = search_panel.get_node("VBoxContainer")
+		var find_bar = search_vbox.get_node("FindBar")
+		replace_bar = search_vbox.get_node("ReplaceBar")
+		
+		input_find = find_bar.get_node("FindInput")
+		btn_prev = find_bar.get_node("FindPrev")
+		btn_next = find_bar.get_node("FindNext")
+		btn_close_search = find_bar.get_node("CloseSearch")
+		
+		input_replace = replace_bar.get_node("ReplaceInput")
+		btn_rep_one = replace_bar.get_node("ReplaceOne")
+		btn_rep_all = replace_bar.get_node("ReplaceAll")
+		
+		_connect_signals()
+		
+		autosave_timer = Timer.new()
+		autosave_timer.wait_time = 2.0
+		autosave_timer.one_shot = true
+		wrapper.add_child(autosave_timer)
+		autosave_timer.timeout.connect(save_if_needed.bind("Autosaved"))
+		
+		editor.text_changed.connect(func(): 
+			status_label.text = "Typing..."
+			autosave_timer.start()
+		)
+		
+		# Focus Logic
+		editor.focus_exited.connect(func(): save_if_needed("Saved"))
+
+	func _connect_signals() -> void:
+		btn_save.pressed.connect(func(): save_if_needed("Saved!"))
+		btn_search.pressed.connect(open_search.bind(false))
+		btn_replace.pressed.connect(open_search.bind(true))
+		
+		btn_close_search.pressed.connect(close_search)
+		btn_next.pressed.connect(find_next)
+		btn_prev.pressed.connect(find_prev)
+		btn_rep_one.pressed.connect(replace_one)
+		btn_rep_all.pressed.connect(replace_all)
+		
+		# FIX: Use gui_input to catch Enter without losing focus
+		input_find.gui_input.connect(func(event):
+			if event is InputEventKey and event.pressed and event.keycode == KEY_ENTER:
+				find_next()
+				input_find.accept_event()
+		)
+
+	func load_file(path: String) -> void:
+		editor.set_meta("file_path", path)
+		wrapper.show()
+		search_panel.hide()
+		
+		var f = FileAccess.open(path, FileAccess.READ)
+		if f:
+			var content = f.get_as_text()
+			editor.text = content
+			editor.set_meta("original_content", content)
+			editor.clear_undo_history()
+			status_label.text = "Ready"
+
+	func save_if_needed(msg: String = "Saved") -> void:
+		if not wrapper.visible or not editor.has_meta("file_path"): return
+		if editor.has_meta("original_content") and editor.text == editor.get_meta("original_content"):
+			return
+		
+		# FIX: Use helper function to satisfy signal warning
+		parent_viewer.trigger_save_request(editor.get_meta("file_path"), editor.text)
+		editor.set_meta("original_content", editor.text)
+		
+		# Visual Flash
+		status_label.text = msg
+		status_label.modulate = Color("41f095")
+		var t = wrapper.create_tween()
+		t.tween_property(status_label, "modulate", Color(1,1,1,0.7), 1.5)
+		
+		var orig_mod = Color(1,1,1,1)
+		editor.modulate = Color(0.5, 1.0, 0.5)
+		var t2 = wrapper.create_tween()
+		t2.tween_property(editor, "modulate", orig_mod, 0.3)
+
+	# --- SEARCH LOGIC ---
+	func open_search(show_replace: bool) -> void:
+		search_panel.show()
+		replace_bar.visible = show_replace
+		input_find.grab_focus()
+		if editor.has_selection():
+			input_find.text = editor.get_selected_text()
+			input_find.select_all() # QoL: Select text so you can type immediately
+			
+	func close_search() -> void:
+		search_panel.hide()
+		editor.grab_focus()
+
+	func find_next() -> void: _perform_search(false)
+	func find_prev() -> void: _perform_search(true)
+
+	func _perform_search(reverse: bool) -> void:
+		var query = input_find.text
+		if query.is_empty(): return
+		
+		var flags = 2 # Match Case off, Words off
+		if reverse: flags += 1 # Add Backwards flag
+		
+		var res = editor.search(query, flags, editor.get_caret_line(), editor.get_caret_column())
+		
+		if res.x == -1: # Wrap around
+			var start_line = 0 if not reverse else editor.get_line_count() - 1
+			var start_col = 0 if not reverse else editor.get_line_width(start_line)
+			res = editor.search(query, flags, start_line, start_col)
+			status_label.text = "Wrapped"
+		
+		if res.x != -1:
+			editor.select(res.y, res.x, res.y, res.x + query.length())
+			editor.set_caret_line(res.y)
+			editor.set_caret_column(res.x + query.length())
+			editor.center_viewport_to_caret()
+		else:
+			status_label.text = "Not Found"
+
+	func replace_one() -> void:
+		var query = input_find.text
+		if query.is_empty(): return
+		# Only replace if currently selected matches query
+		if editor.has_selection() and editor.get_selected_text() == query:
+			editor.insert_text_at_caret(input_replace.text)
+			find_next()
+		else:
+			find_next()
+
+	func replace_all() -> void:
+		var query = input_find.text
+		if query.is_empty(): return
+		var new_text = editor.text.replace(query, input_replace.text)
+		if new_text != editor.text:
+			editor.text = new_text
+			save_if_needed("Replaced All")
+
+# ---------------------------------------------------------
+
 func _ready() -> void:
 	hide()
 	close_btn.pressed.connect(_close)
 	btn_prev_row.pressed.connect(_nav_row.bind(-1))
 	btn_next_row.pressed.connect(_nav_row.bind(1))
 	
-	# Connect Column Selectors
 	col_select_left.item_selected.connect(func(_idx): _refresh_panel(true))
 	col_select_right.item_selected.connect(func(_idx): _refresh_panel(false))
 	
-	# Connect Text Saving
-	txt_left.focus_exited.connect(_save_left)
-	txt_right.focus_exited.connect(_save_right)
+	# Initialize Text Controllers
+	_left_controller = TextController.new(text_wrapper_left, self)
+	_right_controller = TextController.new(text_wrapper_right, self)
 	
-	# ZOOM: Connect Input and Cursor Logic
-	var left_container = img_left.get_parent()
-	var right_container = img_right.get_parent()
+	# Zoom Logic
+	img_left.gui_input.connect(_handle_image_input.bind(img_left))
+	img_right.gui_input.connect(_handle_image_input.bind(img_right))
 	
-	left_container.gui_input.connect(_handle_image_input.bind(img_left))
-	right_container.gui_input.connect(_handle_image_input.bind(img_right))
+	# Cursor Logic
+	var c_left = img_left.get_parent() # ContentContainer
+	var c_right = img_right.get_parent()
+	c_left.mouse_entered.connect(_update_cursor.bind(img_left))
+	c_right.mouse_entered.connect(_update_cursor.bind(img_right))
+	c_left.mouse_exited.connect(_reset_cursor)
+	c_right.mouse_exited.connect(_reset_cursor)
+	c_left.gui_input.connect(_handle_image_input.bind(img_left))
+	c_right.gui_input.connect(_handle_image_input.bind(img_right))
+
+func _gui_input(event: InputEvent) -> void:
+	# CLICK OFF FEATURE
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		# If the click reaches here (The Root), it means NO child node handled it.
+		# Therefore, it was a click on the background/void.
+		_close()
+
+# FIX: Public function to satisfy signal warning
+func trigger_save_request(path: String, content: String) -> void:
+	request_save_text.emit(path, content)
+
+func _input(event: InputEvent) -> void:
+	if not visible: return
 	
-	# Cursor Updates
-	left_container.mouse_entered.connect(_update_cursor.bind(img_left))
-	right_container.mouse_entered.connect(_update_cursor.bind(img_right))
-	left_container.mouse_exited.connect(_reset_cursor)
-	right_container.mouse_exited.connect(_reset_cursor)
+	# GLOBAL SHORTCUTS (Apply to focused editor)
+	if event.is_action_pressed("ui_cancel"):
+		# Close search if open, or close app
+		var handled = false
+		
+		# Check Left
+		if _left_controller.search_panel.visible:
+			_left_controller.close_search()
+			handled = true
+		# Check Right
+		if _right_controller.search_panel.visible:
+			_right_controller.close_search()
+			handled = true
+			
+		if not handled:
+			_close()
+		get_viewport().set_input_as_handled()
+		
+	elif event is InputEventKey and event.pressed:
+		# Determine active controller based on focus or mouse position
+		var active_ctrl = _get_active_controller()
+		if not active_ctrl: return
+		
+		if event.keycode == KEY_S and event.is_command_or_control_pressed():
+			active_ctrl.save_if_needed("Saved")
+			get_viewport().set_input_as_handled()
+			
+		elif event.keycode == KEY_F and event.is_command_or_control_pressed():
+			active_ctrl.open_search(false)
+			get_viewport().set_input_as_handled()
+			
+		elif event.keycode == KEY_R and event.is_command_or_control_pressed():
+			active_ctrl.open_search(true)
+			get_viewport().set_input_as_handled()
+
+func _get_active_controller() -> TextController:
+	# Returns the controller that owns the focused element
+	var focus = get_viewport().gui_get_focus_owner()
+	if focus:
+		if _left_controller.wrapper.is_ancestor_of(focus): return _left_controller
+		if _right_controller.wrapper.is_ancestor_of(focus): return _right_controller
+	
+	# Fallback: Mouse position
+	var m_pos = get_global_mouse_position()
+	if _left_controller.wrapper.get_global_rect().has_point(m_pos) and _left_controller.wrapper.visible:
+		return _left_controller
+	if _right_controller.wrapper.get_global_rect().has_point(m_pos) and _right_controller.wrapper.visible:
+		return _right_controller
+	return null
 
 func open(dataset: Dictionary, stems_list: Array, start_stem: String, cols: Array, start_col_name: String = "") -> void:
 	_dataset = dataset
@@ -106,8 +353,8 @@ func open(dataset: Dictionary, stems_list: Array, start_stem: String, cols: Arra
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 func _nav_row(direction: int) -> void:
-	_save_left()
-	_save_right()
+	_left_controller.save_if_needed()
+	_right_controller.save_if_needed()
 	var new_index = _current_index + direction
 	if new_index >= 0 and new_index < _stems.size():
 		_current_index = new_index
@@ -131,12 +378,12 @@ func _refresh_panel(is_left: bool) -> void:
 	
 	var col_name = _columns[col_idx]
 	var img_node = img_left if is_left else img_right
-	var txt_node = txt_left if is_left else txt_right
+	var txt_ctrl = _left_controller if is_left else _right_controller
 	
 	# Reset State
 	img_node.texture = null
 	img_node.hide()
-	txt_node.hide()
+	txt_ctrl.wrapper.hide()
 	_reset_zoom(img_node)
 	
 	var files = _dataset.get(stem, {}).get(col_name, [])
@@ -148,7 +395,7 @@ func _refresh_panel(is_left: bool) -> void:
 	if ext in ["png", "jpg", "jpeg", "webp"]:
 		_load_image(img_node, file_path)
 	elif ext in ["txt", "md", "json"]:
-		_load_text(txt_node, file_path)
+		txt_ctrl.load_file(file_path)
 
 func _load_image(node: TextureRect, path: String) -> void:
 	node.show()
@@ -157,33 +404,9 @@ func _load_image(node: TextureRect, path: String) -> void:
 		node.texture = ImageTexture.create_from_image(img)
 	_reset_zoom(node)
 
-func _load_text(node: CodeEdit, path: String) -> void:
-	node.show()
-	node.set_meta("file_path", path)
-	node.text = ""
-	
-	var f = FileAccess.open(path, FileAccess.READ)
-	if f:
-		var content = f.get_as_text()
-		node.text = content
-		node.set_meta("original_content", content) 
-		node.clear_undo_history()
-
-# --- TEXT SAVING ---
-
-func _save_left() -> void: _perform_save(txt_left)
-func _save_right() -> void: _perform_save(txt_right)
-
-func _perform_save(editor: CodeEdit) -> void:
-	if not editor.visible or not editor.has_meta("file_path"): return
-	if editor.has_meta("original_content") and editor.text == editor.get_meta("original_content"):
-		return
-	request_save_text.emit(editor.get_meta("file_path"), editor.text)
-	editor.set_meta("original_content", editor.text)
-
 func _close() -> void:
-	_save_left()
-	_save_right()
+	_left_controller.save_if_needed()
+	_right_controller.save_if_needed()
 	closed.emit()
 	hide()
 
@@ -196,7 +419,6 @@ func _handle_image_input(event: InputEvent, node: TextureRect) -> void:
 	var is_left = (node == img_left)
 	var is_zoomed = (node.stretch_mode == TextureRect.STRETCH_SCALE)
 	
-	# Update Cursor continuously
 	if event is InputEventMouseMotion:
 		_update_cursor(node)
 		
@@ -209,33 +431,43 @@ func _handle_image_input(event: InputEvent, node: TextureRect) -> void:
 				_has_dragged_significantly = true
 			
 			node.position = _clamp_position(node, _drag_start_img_pos + diff)
+			# Consuming motion events isn't strictly necessary, but good practice when dragging
+			get_viewport().set_input_as_handled()
 
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			# MOUSE DOWN
+			# --- MOUSE DOWN ---
 			if is_zoomed:
-				# Start Pan
+				# Already zoomed -> Start Drag logic
 				if is_left: _dragging_left = true
 				else: _dragging_right = true
+				
 				_drag_start_mouse_pos = event.global_position
 				_drag_start_img_pos = node.position
 				_has_dragged_significantly = false
+				
+				get_viewport().set_input_as_handled() # STOP BUBBLING
 			else:
-				# Check if clicking on actual image or void
+				# Not zoomed -> Zoom In
 				var container = node.get_parent()
 				var mouse_pos = container.get_local_mouse_position()
+				
+				# Only zoom if clicking actual image content
 				if _get_draw_rect(node).has_point(mouse_pos):
 					_zoom_in(node, mouse_pos)
+					get_viewport().set_input_as_handled() # STOP BUBBLING
 		
 		else:
-			# MOUSE UP
+			# --- MOUSE UP ---
 			var was_dragging = _dragging_left if is_left else _dragging_right
 			
+			# Reset drag flags
 			if is_left: _dragging_left = false
 			else: _dragging_right = false
 			
-			if was_dragging and not _has_dragged_significantly:
+			if was_dragging and is_zoomed and not _has_dragged_significantly:
 				_zoom_out(node)
+				get_viewport().set_input_as_handled() # STOP BUBBLING
 
 func _zoom_in(node: TextureRect, pivot: Vector2) -> void:
 	# Calculate relative position before resizing
