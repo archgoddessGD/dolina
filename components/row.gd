@@ -9,6 +9,7 @@ signal request_create_txt(stem: String, column: String)
 signal request_save_text(path: String, new_content: String)
 signal request_upload(stem: String, column: String)
 signal request_direct_upload(stem: String, column: String, path: String)
+signal request_side_by_side(stem: String, col_name: String)
 
 var stem: String
 var data: Dictionary
@@ -121,7 +122,7 @@ func _update_content(cell_width: float, row_height: float, autosave_enabled: boo
 		elif files.size() > 1:
 			_create_conflict_state(cell_node, files)
 		else:
-			_create_file_view(cell_node, files[0], cell_width, row_height, autosave_enabled)
+			_create_file_view(cell_node, files[0], col_name, cell_width, row_height, autosave_enabled)
 
 # --- CELL STATES (These remain the same as your previous version) ---
 
@@ -168,12 +169,39 @@ func _create_conflict_state(parent: Node, files: Array) -> void:
 		del_btn.pressed.connect(func(): emit_signal("request_delete_file", f_path))
 		row.add_child(del_btn)
 		
-func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.0, row_height: float = 240.0, autosave_enabled: bool = false) -> void:
+func _create_file_view(parent: Node, file_path: String, col_name: String, max_width: float = 2000.0, row_height: float = 240.0, autosave_enabled: bool = false) -> void:
 	var ext = file_path.get_extension().to_lower()
 	
 	var sidebar = VBoxContainer.new()
 	sidebar.alignment = BoxContainer.ALIGNMENT_CENTER
 	sidebar.custom_minimum_size.x = 40 
+	
+	var sbs_btn = Button.new()
+	sbs_btn.custom_minimum_size = Vector2(30, 30)
+	sbs_btn.tooltip_text = "Compare (Side by Side)"
+	
+	# Create a MarginContainer to hold the icon
+	var icon_margin = MarginContainer.new()
+	icon_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE # Important! Let click pass through
+	
+	# Add internal padding
+	icon_margin.add_theme_constant_override("margin_left", 6)
+	icon_margin.add_theme_constant_override("margin_right", 6)
+	icon_margin.add_theme_constant_override("margin_top", 6)
+	icon_margin.add_theme_constant_override("margin_bottom", 6)
+	
+	var icon_rect = TextureRect.new()
+	icon_rect.texture = load("res://assets/side_by_side.svg")
+	icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	
+	icon_margin.add_child(icon_rect)
+	sbs_btn.add_child(icon_margin)
+	
+	sbs_btn.pressed.connect(func(): emit_signal("request_side_by_side", stem, col_name))
+	# ----------------------------------------
+
 	var del_btn = Button.new()
 	del_btn.text = "🗑️"
 	del_btn.tooltip_text = "Delete"
@@ -228,6 +256,8 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 		img_btn.pressed.connect(func(): _on_image_clicked(file_path))
 		
 		parent.add_child(img_btn)
+		# ADD SIDEBAR
+		sidebar.add_child(sbs_btn) # Add here
 		sidebar.add_child(del_btn)
 		parent.add_child(sidebar)
 
@@ -325,6 +355,7 @@ func _create_file_view(parent: Node, file_path: String, max_width: float = 2000.
 			emit_signal("request_expanded_text", file_path, text_edit.text)
 		)
 		
+		sidebar.add_child(sbs_btn)
 		sidebar.add_child(expand_btn)
 		sidebar.add_child(save_btn)
 		sidebar.add_child(del_btn)

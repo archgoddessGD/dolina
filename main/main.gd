@@ -20,6 +20,7 @@ const WelcomeScene = preload("res://components/WelcomeScreen.tscn")
 @onready var error_state: ErrorState = %ErrorState
 @onready var empty_state: EmptyState = %EmptyState
 @onready var text_editor: TextEditor = %TextEditor
+@onready var side_by_side_viewer: SideBySideViewer = %SideBySideViewer
 
 # --- DATA CONTROLLER ---
 @onready var project_manager: ProjectManager = %ProjectManager
@@ -50,6 +51,25 @@ func _ready() -> void:
 		empty_state.hide()
 		_scan_and_populate_projects()
 		_show_toast("Examples Loaded!")
+	)
+
+	# Connect the SideBySideViewer signals
+	side_by_side_viewer.request_save_text.connect(func(path, content):
+		# 1. Save to Disk
+		_handle_save_text(path, content)
+		
+		# 2. Smart Update the Grid (Visual)
+		# We need to find the specific row and update its text memory
+		var stem = path.get_file().get_basename()
+		for child in row_container.get_children():
+			if child is Row and child.stem == stem:
+				child.update_text_cell(path, content)
+				break
+	)
+	
+	# When the viewer closes, refresh the grid so text previews update
+	side_by_side_viewer.closed.connect(func():
+		_render_grid()
 	)
 	
 	# We listen to the Header's "events", not the individual buttons
@@ -558,6 +578,8 @@ func _render_grid(col_width: float = -1.0) -> void:
 			)
 			row_instance.request_upload.connect(_handle_request_upload)
 			row_instance.request_direct_upload.connect(_handle_direct_upload)
+			if not row_instance.request_side_by_side.is_connected(_on_row_request_sbs):
+				row_instance.request_side_by_side.connect(_on_row_request_sbs)
 		
 		# 2. Setup the Row (This is the "Renovation" part)
 		row_instance.setup(
@@ -688,3 +710,17 @@ func _on_search_completed(results: Array) -> void:
 	_render_grid()
 	_update_pagination_labels()
 	scroll_container.scroll_vertical = 0
+
+func _on_row_request_sbs(stem: String, col_name: String) -> void:
+	var dataset = project_manager.current_dataset
+	var cols = project_manager.current_columns
+	
+	# Determine the context (Are we searching?)
+	var stems_list = []
+	if %SearchManager.is_active():
+		stems_list = filtered_stems
+	else:
+		stems_list = dataset.keys()
+		stems_list.sort() # Ensure order matches grid
+			
+	side_by_side_viewer.open(dataset, stems_list, stem, cols, col_name)
