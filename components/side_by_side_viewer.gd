@@ -22,6 +22,8 @@ signal closed
 @onready var btn_prev_row: Button = %BtnPrevRow
 @onready var btn_next_row: Button = %BtnNextRow
 @onready var position_label: Label = %PositionLabel
+@onready var split_view: HSplitContainer = $MarginContainer/VBoxContainer/SplitView
+@onready var split_handle_nav: Control = $SplitHandleNav
 
 # Used for Click-Off detection (The actual visual UI box)
 @onready var ui_box: VBoxContainer = $MarginContainer/VBoxContainer
@@ -269,6 +271,53 @@ func _ready() -> void:
 	c_right.mouse_exited.connect(_reset_cursor)
 	c_left.gui_input.connect(_handle_image_input.bind(img_left))
 	c_right.gui_input.connect(_handle_image_input.bind(img_right))
+	
+	split_view.dragged.connect(_on_split_dragged)
+	split_view.resized.connect(_update_handle_position)
+	visibility_changed.connect(func():
+		if visible:
+			# Reset split to center on show (Optional, remove if you want to remember position)
+			split_view.split_offset = 0 
+			
+			# Wait for layout to settle
+			await get_tree().process_frame
+			_update_handle_position()
+	)
+	
+func _on_split_dragged(_offset: int) -> void:
+	_update_handle_position()
+
+func _update_handle_position() -> void:
+	if not is_inside_tree() or not visible: return
+
+	var left_panel_control = split_view.get_child(0) as Control
+	if not left_panel_control: return
+	
+	# Safety check: If layout hasn't run, left panel might be tiny. 
+	# Don't move yet to avoid visual glitches at (0,0).
+	if left_panel_control.size.x <= 1: return
+
+	# 1. Calculate X (Center of the split handle)
+	# Note: get_theme_constant return 0 if the theme doesn't define it explicitly,
+	# so we default to 0 if null, but usually it returns an int.
+	var separation = split_view.get_theme_constant("separation")
+	
+	# Left Panel Width + Half the Gap
+	var center_x = left_panel_control.size.x + (separation / 2.0)
+	
+	# Center the button panel on that X
+	var final_x = center_x - (split_handle_nav.size.x / 2.0)
+	
+	# 2. Calculate Y (Vertically centered)
+	var final_y = (split_view.size.y - split_handle_nav.size.y) / 2.0
+	
+	# 3. Apply Global Position
+	# We rely on split_view global position to be accurate
+	var global_target = split_view.get_global_position() + Vector2(final_x, final_y)
+	
+	# Only move if there is a significant change (optimization)
+	if split_handle_nav.global_position.distance_squared_to(global_target) > 1.0:
+		split_handle_nav.global_position = global_target
 
 func _gui_input(event: InputEvent) -> void:
 	# CLICK OFF FEATURE
@@ -392,10 +441,22 @@ func open(dataset: Dictionary, stems_list: Array, start_stem: String, cols: Arra
 		else:
 			col_select_right.selected = start_col_idx
 
+	# 1. Force the split to reset to the middle (50/50)
 	$MarginContainer/VBoxContainer/SplitView.split_offset = 0
+	
+	# 2. Update the images/text content
 	_update_view()
+	
+	# 3. Show the UI immediately
 	show()
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	
+	# We wait 2 frames: one for visibility, one for container sizing.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	
+	# NOW calculate the handle position based on the correct sizes
+	_update_handle_position()
 
 func _nav_row(direction: int) -> void:
 	_left_controller.save_if_needed()
