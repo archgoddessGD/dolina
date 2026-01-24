@@ -14,6 +14,7 @@ var current_dataset: Dictionary = {}
 var current_columns: Array[String] = []
 var is_fresh_install: bool = false
 var autosave_enabled: bool = true
+var column_conflicts: Dictionary = {}
 
 # --- PATHS ---
 var _column_path_map: Dictionary = {}
@@ -269,21 +270,24 @@ func _scan_folder_into_dataset(col_name: String, folder_path: String) -> void:
 	dir.list_dir_begin()
 	var file = dir.get_next()
 	while file != "":
-		# Added check for CONFIG_FILENAME so we don't try to load the config as data
 		if not dir.current_is_dir() and not file.begins_with(".") and not file.ends_with(".import") and file != CONFIG_FILENAME:
 			var stem = file.get_basename() 
 			
 			if not current_dataset.has(stem):
 				current_dataset[stem] = {}
-				# Note: We don't pre-fill all columns here because 
-				# in Config mode, we iterate defined columns, not folders.
 			
 			if not current_dataset[stem].has(col_name):
 				current_dataset[stem][col_name] = []
 			
-			# Store the FULL resolved path
 			current_dataset[stem][col_name].append(folder_path + "/" + file)
 			
+			# If we just added a second file, mark this column as conflicted
+			if current_dataset[stem][col_name].size() > 1:
+				if not column_conflicts.has(col_name):
+					column_conflicts[col_name] = []
+				
+				# We don't know the page number yet because search/sorting 
+				# happens in Main, so we'll just store the fact that it exists.
 		file = dir.get_next()
 
 func _resolve_path(proj_root: String, raw_path: String) -> String:

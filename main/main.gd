@@ -448,6 +448,7 @@ func _update_ui() -> void:
 		
 		var folder_btn = Button.new()
 		folder_btn.text = "📂"
+		folder_btn.tooltip_text = "Open folder containing this column in file explorer"
 		folder_btn.focus_mode = Control.FOCUS_NONE
 		folder_btn.flat = true
 		folder_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -458,14 +459,24 @@ func _update_ui() -> void:
 		)
 		controls_hbox.add_child(folder_btn)
 		
-		var flash_btn = Button.new()
-		flash_btn.text = "📄"
-		flash_btn.focus_mode = Control.FOCUS_NONE
-		flash_btn.flat = true
-		flash_btn.modulate = Color("41f095") 
-		flash_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		flash_btn.pressed.connect(_handle_bulk_populate.bind(col))
-		controls_hbox.add_child(flash_btn)
+		var fill_btn = Button.new() 
+		fill_btn.text = "📄"
+		fill_btn.tooltip_text = "Bulk fill all empty rows in this column with .txt files" # Added Tooltip
+		fill_btn.focus_mode = Control.FOCUS_NONE
+		fill_btn.flat = true
+		fill_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		fill_btn.pressed.connect(_handle_bulk_populate.bind(col))
+		controls_hbox.add_child(fill_btn)
+		
+		if project_manager.column_conflicts.has(col):
+			var conflict_btn = Button.new()
+			conflict_btn.text = "⚠️"
+			conflict_btn.flat = true
+			conflict_btn.modulate = Color.ORANGE
+			conflict_btn.tooltip_text = "File conflict - two files of the same name. Click to go to the affected page."
+			conflict_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			conflict_btn.pressed.connect(_jump_to_conflict.bind(col))
+			controls_hbox.add_child(conflict_btn)
 		
 		var col_search = LineEdit.new()
 		col_search.placeholder_text = "Search..."
@@ -724,3 +735,29 @@ func _on_row_request_sbs(stem: String, col_name: String) -> void:
 		stems_list.sort() # Ensure order matches grid
 			
 	side_by_side_viewer.open(dataset, stems_list, stem, cols, col_name)
+
+func _jump_to_conflict(col_name: String) -> void:
+	var dataset = project_manager.current_dataset
+	var source_list = []
+	
+	if %SearchManager.is_active():
+		source_list = filtered_stems
+	else:
+		source_list = dataset.keys()
+		source_list.sort()
+
+	var conflict_index = -1
+	for i in range(source_list.size()):
+		var stem = source_list[i]
+		if dataset[stem].get(col_name, []).size() > 1:
+			conflict_index = i
+			break
+	
+	if conflict_index != -1:
+		# Calculate which page this index belongs to
+		var target_page = floor(float(conflict_index) / float(page_size)) + 1
+		_on_page_jump_requested(target_page)
+		_show_toast("Jumped to conflict in " + col_name)
+	else:
+		_show_toast("Conflict no longer exists.")
+		_render_grid() # Refresh to clear the warning icon

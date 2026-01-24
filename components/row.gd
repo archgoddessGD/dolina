@@ -145,29 +145,46 @@ func _create_empty_state(parent: Node, col_name: String) -> void:
 	vbox.add_child(btn_upload)
 
 func _create_conflict_state(parent: Node, files: Array) -> void:
-	if parent is BoxContainer: parent.alignment = BoxContainer.ALIGNMENT_BEGIN
+	if parent is BoxContainer: 
+		parent.alignment = BoxContainer.ALIGNMENT_BEGIN
+	
 	var scroll = ScrollContainer.new()
 	scroll.size_flags_horizontal = SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = SIZE_EXPAND_FILL
 	parent.add_child(scroll)
+	
 	var vbox = VBoxContainer.new()
+	vbox.size_flags_horizontal = SIZE_EXPAND_FILL
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.size_flags_vertical = SIZE_EXPAND_FILL 
 	scroll.add_child(vbox)
+	
 	var label = Label.new()
 	label.text = "⚠️ Conflict: %d" % files.size()
 	label.modulate = Color.ORANGE
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(label)
+	
 	for f_path in files:
-		var row = HBoxContainer.new()
-		vbox.add_child(row)
-		var f_label = Label.new()
-		f_label.text = f_path.get_file()
-		f_label.clip_text = true
-		f_label.size_flags_horizontal = SIZE_EXPAND_FILL
-		row.add_child(f_label)
+		var row_item = HBoxContainer.new()
+		row_item.size_flags_horizontal = SIZE_EXPAND_FILL
+		row_item.add_theme_constant_override("separation", 8) 
+		vbox.add_child(row_item)
+		
 		var del_btn = Button.new()
 		del_btn.text = "X"
 		del_btn.modulate = Color.RED
+		del_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER 
 		del_btn.pressed.connect(func(): emit_signal("request_delete_file", f_path))
-		row.add_child(del_btn)
+		row_item.add_child(del_btn)
+		
+		var f_label = Label.new()
+		f_label.text = f_path.get_file()
+		f_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+
+		f_label.size_flags_horizontal = SIZE_EXPAND_FILL 
+		
+		row_item.add_child(f_label)
 		
 func _create_file_view(parent: Node, file_path: String, col_name: String, max_width: float = 2000.0, row_height: float = 240.0, autosave_enabled: bool = false) -> void:
 	var ext = file_path.get_extension().to_lower()
