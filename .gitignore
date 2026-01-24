@@ -1,6 +1,7 @@
 examples/**/*.import
 .godot/
 export/
+data/deleted_files/
 builds/
 dist/
 export_presets.cfg

@@ -15,15 +15,58 @@ var stem: String
 var data: Dictionary
 var columns: Array
 
-# --- INNER CLASS ---
+# --- INNER CLASSES ---
+
+# 1. The "Upload / Empty Slot" Button
 class DragDropButton extends Button:
 	signal file_dropped(path: String)
+	
 	func _ready() -> void:
 		get_viewport().files_dropped.connect(_on_files_dropped)
+		
+	# Handle OS Drag & Drop
 	func _on_files_dropped(files: PackedStringArray) -> void:
 		if get_global_rect().has_point(get_global_mouse_position()):
 			if is_visible_in_tree() and files.size() > 0:
 				file_dropped.emit(files[0])
+
+	# Handle Internal Godot Drag & Drop
+	func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+		return typeof(data) == TYPE_DICTIONARY and data.get("type") == "dolina_file"
+
+	func _drop_data(_at_position: Vector2, data: Variant) -> void:
+		file_dropped.emit(data["path"])
+
+# 2. The "Existing Image" Button
+class DraggableImageButton extends Button:
+	# Note: We removed the 'file_dropped' signal since this button no longer accepts drops.
+	
+	var file_path: String = ""
+	var texture_preview: Texture2D = null
+	
+	# We don't need _ready anymore since we aren't listening for OS drops
+	
+	# --- AS SOURCE (Dragging this image) ---
+	# FIX: Added underscore to _at_position to silence the warning
+	func _get_drag_data(_at_position: Vector2) -> Variant:
+		# 1. Create the visual preview that follows the mouse
+		var preview_control = Control.new()
+		var preview_icon = TextureRect.new()
+		preview_icon.texture = texture_preview
+		preview_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		preview_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		preview_icon.custom_minimum_size = Vector2(120, 120)
+		# Center the preview on the mouse cursor
+		preview_icon.position = -0.5 * preview_icon.custom_minimum_size
+		
+		preview_control.add_child(preview_icon)
+		set_drag_preview(preview_control)
+		
+		# 2. Return the data payload
+		return { "type": "dolina_file", "path": file_path }
+
+	# REMOVED: _can_drop_data and _drop_data
+	# This ensures you cannot drop anything onto an existing image.
 
 # ---------------------------------------------------
 
@@ -47,12 +90,8 @@ func _build_structure() -> void:
 	var stem_label = Label.new()
 	stem_label.name = "StemLabel"
 	
-	# STRICT WIDTH: Keeps the layout stable
 	stem_label.custom_minimum_size.x = 150
 	
-	# CRITICAL FIX FOR BLANK LABELS: 
-	# We must tell the label to fill the vertical space of the row, 
-	# otherwise the "Autowrap" feature might calculate a height of 0.
 	stem_label.size_flags_vertical = SIZE_EXPAND_FILL 
 	
 	# Wrapping & Alignment
@@ -227,7 +266,10 @@ func _create_file_view(parent: Node, file_path: String, col_name: String, max_wi
 	
 	# A. IMAGES
 	if ext in ["png", "jpg", "jpeg", "webp"]:
-		var img_btn = Button.new()
+		# Use our custom class instead of standard Button
+		var img_btn = DraggableImageButton.new()
+		img_btn.file_path = file_path # Store path for drag payload
+		
 		img_btn.flat = true
 		img_btn.clip_contents = true
 		img_btn.size_flags_horizontal = SIZE_SHRINK_CENTER
@@ -255,6 +297,9 @@ func _create_file_view(parent: Node, file_path: String, col_name: String, max_wi
 		ThumbnailLoader.request_thumbnail(file_path, int(row_height * 2), func(texture):
 			if is_instance_valid(img_btn) and texture:
 				tex_rect.texture = texture
+				# Pass texture to the button so it can generate the drag preview
+				img_btn.texture_preview = texture
+				
 				var t_size = texture.get_size()
 				var aspect = t_size.x / t_size.y
 				var display_h = row_height
@@ -274,7 +319,7 @@ func _create_file_view(parent: Node, file_path: String, col_name: String, max_wi
 		
 		parent.add_child(img_btn)
 		# ADD SIDEBAR
-		sidebar.add_child(sbs_btn) # Add here
+		sidebar.add_child(sbs_btn) 
 		sidebar.add_child(del_btn)
 		parent.add_child(sidebar)
 
