@@ -8,11 +8,11 @@
 
 Dolina is a desktop application built with Godot. It helps manage local datasets by visually aligning files based on their filenames. It fills the gap between file browsers (which are suboptimal for datasets) and database tools (which are too complex for single users).
 
-## ⚙️ Video Showcase
+## Video Showcase
 
 https://github.com/user-attachments/assets/1ce76094-7c1f-4408-898e-ec743636fd68
 
-## ⚙️ Usage & Dataset Structure
+## Usage & Dataset Structure
 
 Dolina reads data in two ways.
 
@@ -96,7 +96,7 @@ Here is an example configuration. In this case, it points to files in the datase
 
 ```
 
-## 🚀 Key Features
+## Key Features
 
 * **No Database:** Folders are columns; filenames are IDs. It works directly with your file system.
 * **Stem-Based Alignment:** Files from different folders (e.g., `images/001.png` and `tags/001.txt`) are aligned into a single row based on the filename (without extension).
