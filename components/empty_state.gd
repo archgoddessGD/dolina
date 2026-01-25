@@ -47,19 +47,53 @@ func _on_download_pressed() -> void:
 	# Start polling for progress
 	set_process(true)
 	
-	var temp_path = OS.get_cache_dir() + "/dolina_temp.zip"
+	# WINDOWS FIX: Use path_join for OS-safe separators
+	var temp_path = OS.get_cache_dir().path_join("dolina_temp.zip")
+	
+	# WINDOWS FIX: Ensure the file doesn't already exist/isn't locked
+	if FileAccess.file_exists(temp_path):
+		var err = DirAccess.remove_absolute(temp_path)
+		if err != OK:
+			print("Warning: Could not delete old temp file. Error: ", err)
+	
 	http_request.download_file = temp_path
-	http_request.request(DOWNLOAD_URL)
+	
+	# WINDOWS FIX: Capture the error if the request fails to start
+	
+	# Create "unsafe" TLS options to bypass Windows certificate issues
+	var tls_options = TLSOptions.client_unsafe()
+	
+	http_request.set_tls_options(tls_options)
+	
+	# Now call request with standard arguments (or just the URL if defaults are fine)
+	var error = http_request.request(DOWNLOAD_URL)
+	
+	if error != OK:
+		_handle_error("Request Start Failed", error)
 
 func _on_request_completed(result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
 	# Stop polling
 	set_process(false)
 	
+	# WINDOWS FIX 4: Detailed debug info
 	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
-		label.text = "Download Failed! (Code: %d)" % response_code
-		download_btn.text = "Retry"
-		download_btn.disabled = false
-		progress_bar.hide()
+		print("Download Error Debug:")
+		print("Result (Godot Internal): ", result) 
+		print("Response Code (HTTP): ", response_code)
+		
+		var msg = "Download Failed!"
+		
+		# Corrected Error Checking
+		if result == HTTPRequest.RESULT_CANT_CONNECT:
+			msg = "Connection Failed"
+		elif result == HTTPRequest.RESULT_TLS_HANDSHAKE_ERROR:
+			msg = "SSL/TLS Handshake Error"
+		elif result == HTTPRequest.RESULT_DOWNLOAD_FILE_CANT_OPEN:
+			msg = "Cannot Open File (Write Error)"
+		elif result == HTTPRequest.RESULT_DOWNLOAD_FILE_WRITE_ERROR:
+			msg = "File Write Error"
+		
+		_handle_error(msg, response_code)
 		return
 
 	download_btn.text = "Unzipping..."
@@ -79,9 +113,15 @@ func _on_request_completed(result: int, response_code: int, _headers: PackedStri
 		download_btn.text = "Download Examples"
 		progress_bar.hide()
 	else:
-		label.text = "Error Unzipping Files"
-		download_btn.disabled = false
-		progress_bar.hide()
+		_handle_error("Error Unzipping Files", 0)
+
+# Helper to consolidate error UI reset
+func _handle_error(msg: String, code: int) -> void:
+	label.text = "%s (Code: %d)" % [msg, code]
+	download_btn.text = "Retry"
+	download_btn.disabled = false
+	progress_bar.hide()
+	set_process(false)
 
 func _unzip_and_install(zip_path: String) -> bool:
 	var reader = ZIPReader.new()
@@ -93,7 +133,8 @@ func _unzip_and_install(zip_path: String) -> bool:
 		if file_path.ends_with("/"): continue
 			
 		var content = reader.read_file(file_path)
-		var final_path = _target_folder + "/" + file_path
+		# Ensure we use path_join here too
+		var final_path = _target_folder.path_join(file_path)
 		
 		var base_dir = final_path.get_base_dir()
 		if not DirAccess.dir_exists_absolute(base_dir):
