@@ -30,6 +30,7 @@ const WelcomeScene = preload("res://components/WelcomeScreen.tscn")
 var current_page: int = 1
 var total_pages: int = 1
 var _upload_target_info: Dictionary = {}
+var _row_lookup: Dictionary = {}
 
 # --- SEARCH STATE ---
 var is_searching: bool = false
@@ -222,6 +223,8 @@ func _connect_signals() -> void:
 	project_manager.project_loaded.connect(_on_project_data_loaded)
 	project_manager.toast_requested.connect(_show_toast)
 	project_manager.error_occurred.connect(_show_toast) # reuse toast for errors
+	project_manager.file_removed.connect(_on_file_removed_from_memory)
+	project_manager.file_added.connect(_on_file_added_to_memory)
 
 # --- PROJECT LOGIC ---
 
@@ -346,6 +349,30 @@ func _handle_delete_file(path: String) -> void:
 
 	safety_dialog.open_delete(prompt, img_path, action_recycle, action_permanent)
 
+func _on_file_removed_from_memory(stem: String, _col_name: String, _path: String) -> void:
+	# OPTIMIZATION: Instant dictionary lookup instead of loop
+	if _row_lookup.has(stem):
+		var target_row = _row_lookup[stem]
+		
+		# Only refresh this specific row
+		target_row.refresh_content(
+			_calculate_column_width(), 
+			row_height, 
+			project_manager.autosave_enabled
+		)
+
+func _on_file_added_to_memory(stem: String, _col_name: String, _path: String) -> void:
+	# Use our cached lookup for O(1) speed
+	if _row_lookup.has(stem):
+		var target_row = _row_lookup[stem]
+		
+		# Refresh the specific row to show the new file
+		target_row.refresh_content(
+			_calculate_column_width(), 
+			row_height, 
+			project_manager.autosave_enabled
+		)
+
 func _handle_save_text(path: String, content: String) -> void:
 	project_manager.save_text_file(path, content)
 
@@ -383,8 +410,6 @@ func _on_file_uploaded(source_path: String) -> void:
 	var stem = _upload_target_info["stem"]
 	var col_name = _upload_target_info["col"]
 	
-	# Use the manager function
-	_is_restoring_view = true
 	project_manager.import_file(stem, col_name, source_path)
 	
 	_upload_target_info.clear()
@@ -562,6 +587,7 @@ func _trigger_preload() -> void:
 
 func _render_grid(col_width: float = -1.0) -> void:
 	if col_width < 0: col_width = _calculate_column_width()
+	_row_lookup.clear()
 	
 	# --- DATA PREP ---
 	var dataset = project_manager.current_dataset
@@ -618,6 +644,8 @@ func _render_grid(col_width: float = -1.0) -> void:
 			row_instance.request_direct_upload.connect(_handle_direct_upload)
 			if not row_instance.request_side_by_side.is_connected(_on_row_request_sbs):
 				row_instance.request_side_by_side.connect(_on_row_request_sbs)
+				
+		_row_lookup[stem] = row_instance
 		
 		# 2. Setup the Row (This is the "Renovation" part)
 		row_instance.setup(

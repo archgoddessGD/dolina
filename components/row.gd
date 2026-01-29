@@ -425,7 +425,13 @@ func _create_file_view(parent: Node, file_path: String, col_name: String, max_wi
 		sidebar.add_child(save_btn)
 		sidebar.add_child(del_btn)
 		parent.add_child(sidebar)
-		
+
+func refresh_content(cell_width: float, row_height: float, autosave_enabled: bool) -> void:
+	# 1. Force the row to forget its previous state
+	reset_optimization()
+
+	_update_content(cell_width, row_height, autosave_enabled)
+
 func _on_image_clicked(path: String) -> void:
 	emit_signal("request_full_image", stem, path)
 	

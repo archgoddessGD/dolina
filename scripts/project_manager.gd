@@ -7,6 +7,8 @@ const BOOTSTRAP_FILE = "user://dolina_bootstrap.json"
 signal project_loaded
 signal error_occurred(message: String)
 signal toast_requested(message: String)
+signal file_removed(stem: String, col_name: String, path: String)
+signal file_added(stem: String, col_name: String, path: String)
 
 # --- DATA STATE ---
 var current_project_name: String = ""
@@ -329,56 +331,79 @@ func save_text_file(path: String, content: String) -> void:
 		f.close()
 		toast_requested.emit("SAVED!")
 
+func _remove_from_memory_dataset(path: String) -> void:
+	var stem = path.get_file().get_basename()
+	# We need to find which column this path belongs to
+	for col in current_dataset.get(stem, {}):
+		var files = current_dataset[stem][col]
+		if files.has(path):
+			files.erase(path)
+			# Emit signal so UI knows exactly what was removed
+			file_removed.emit(stem, col, path) 
+			return
+
 func delete_file_permanently(path: String) -> void:
-	var dir = DirAccess.open(path.get_base_dir())
-	if dir and dir.remove(path.get_file()) == OK:
-		toast_requested.emit("Permanently Deleted")
-		load_project(current_project_name)
-	else:
-		error_occurred.emit("Failed to delete file.")
+	# A. Update Memory Immediately
+	_remove_from_memory_dataset(path)
+	
+	# B. Perform Disk I/O on Background Thread
+	WorkerThreadPool.add_task(func():
+		var dir = DirAccess.open(path.get_base_dir())
+		if dir and dir.remove(path.get_file()) == OK:
+			# Optional: confirm success in logs, but UI is already updated
+			pass
+		else:
+			# If disk fails, we might want to alert, but for now just log
+			print_rich("[color=red]Failed to delete file on disk:[/color] ", path)
+	)
+	
+	toast_requested.emit("Permanently Deleted")
 
 func move_file_to_trash(source_path: String) -> void:
-	# 1. Determine the destination in the internal deleted_files folder.
-	# We want to preserve hierarchy if possible, but for external files, 
-	# we might just flat-map them or put them in an "External" folder.
-	
+	# 1. OPTIMISTIC UPDATE: Remove from memory immediately so UI refreshes instantly
+	_remove_from_memory_dataset(source_path)
+
+	# 2. PREPARE PATHS
+	# We do this on the main thread to ensure we get the correct target name
 	var target_subpath = ""
 	
 	if source_path.begins_with(datasets_root_path):
-		# It's an internal file, preserve relative structure
+		# Internal file: preserve folder structure
 		target_subpath = source_path.replace(datasets_root_path + "/", "")
 	else:
-		# It's external. To avoid path chaos, let's put it in a folder named after the project
-		# and just use the filename.
+		# External file: flatten into a specific folder
 		target_subpath = current_project_name + "/External_Deleted/" + source_path.get_file()
 
 	var target_full_path = deleted_root_path + "/" + target_subpath
 	var target_dir = target_full_path.get_base_dir()
 	
-	if not DirAccess.dir_exists_absolute(target_dir):
-		DirAccess.make_dir_recursive_absolute(target_dir)
-	
-	# 2. Handle File Name Conflicts (Same as before)
+	# 3. HANDLE CONFLICTS
+	# We check existence here to determine the final filename before threading
 	var final_path = target_full_path
 	var extension = final_path.get_extension()
-	
-	# To properly increment, we need the filename base, not full path base
 	var file_basename = final_path.get_file().get_basename()
-	var folder = target_full_path.get_base_dir()
+	var folder = target_dir # Use the calculated target_dir
 	
 	var counter = 1
 	while FileAccess.file_exists(final_path):
 		final_path = folder + "/" + file_basename + " (%d)." % counter + extension
 		counter += 1
 		
-	# 3. Move
-	# We must use DirAccess.rename_absolute because source might be on a different drive
-	var err = DirAccess.rename_absolute(source_path, final_path)
-	if err == OK:
-		toast_requested.emit("Moved to Trash")
-		load_project(current_project_name)
-	else:
-		error_occurred.emit("Error moving file: " + error_string(err))
+	# 4. ENSURE DIRECTORY EXISTS
+	if not DirAccess.dir_exists_absolute(target_dir):
+		DirAccess.make_dir_recursive_absolute(target_dir)
+	
+	# 5. EXECUTE MOVE (BACKGROUND THREAD)
+	# The heavy lifting happens here so the UI doesn't stutter
+	WorkerThreadPool.add_task(func():
+		var err = DirAccess.rename_absolute(source_path, final_path)
+		if err != OK:
+			# Note: We use print because we are in a thread. 
+			# The UI has already "deleted" it, so we just log the error.
+			print_rich("[color=red]Error moving file to trash:[/color] ", error_string(err))
+	)
+	
+	toast_requested.emit("Moved to Trash")
 
 func populate_empty_files(col_name: String, content: String = "") -> void:
 	if not _column_path_map.has(col_name):
@@ -411,13 +436,40 @@ func import_file(stem: String, col_name: String, source_path: String) -> void:
 	var ext = source_path.get_extension()
 	var target_path = folder_path + "/" + stem + "." + ext
 	
-	# Use DirAccess.copy_absolute to support cross-drive copying
-	var err = DirAccess.copy_absolute(source_path, target_path)
-	if err == OK:
-		load_project(current_project_name)
-	else:
-		error_occurred.emit("Import Failed: " + error_string(err))
+	# 1. THREADED COPY
+	# We move the heavy lifting to the background
+	WorkerThreadPool.add_task(func():
+		# This happens on a background thread
+		var err = DirAccess.copy_absolute(source_path, target_path)
+		
+		if err == OK:
+			# 2. SUCCESS: Schedule the memory update on the Main Thread
+			# We use call_deferred to safely jump back to the main thread
+			call_deferred("_finalize_import", stem, col_name, target_path)
+		else:
+			call_deferred("emit_signal", "error_occurred", "Import Failed: " + error_string(err))
+	)
+
+func _finalize_import(stem: String, col_name: String, path: String) -> void:
+	# A. Update Memory
+	if not current_dataset.has(stem):
+		current_dataset[stem] = {}
 	
+	if not current_dataset[stem].has(col_name):
+		current_dataset[stem][col_name] = []
+		
+	current_dataset[stem][col_name].append(path)
+	
+	# Optional: Check for conflicts (if > 1 file in cell)
+	if current_dataset[stem][col_name].size() > 1:
+		if not column_conflicts.has(col_name):
+			column_conflicts[col_name] = []
+			
+	# B. Notify UI
+	# This replaces the heavy "load_project()" call
+	file_added.emit(stem, col_name, path)
+	toast_requested.emit("File Imported!")
+
 func save_config(settings_data: Dictionary) -> void:
 	var path = _base_data_path + "/dolina_settings.json"
 	var file = FileAccess.open(path, FileAccess.WRITE)
