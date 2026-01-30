@@ -6,6 +6,7 @@ signal project_selected(index: int)
 signal refresh_requested
 signal settings_requested
 signal automation_requested
+signal audit_requested
 signal page_change_requested(direction: int)
 signal page_jump_requested(page_number: int)
 
@@ -13,6 +14,7 @@ signal page_jump_requested(page_number: int)
 @onready var project_select: OptionButton = %ProjectSelect
 @onready var refresh_btn: Button = %RefreshBtn
 @onready var settings_btn: Button = %SettingsBtn
+@onready var audit_btn: Button = %AuditBtn
 @onready var auto_btn: Button = %AutoBtn
 @onready var auto_progress: ProgressBar = %AutoProgress
 @onready var auto_progress_btn: Button = %AutoProgressBtn
@@ -25,6 +27,9 @@ func _ready() -> void:
 	# Internal wiring
 	refresh_btn.pressed.connect(func(): refresh_requested.emit())
 	settings_btn.pressed.connect(func(): settings_requested.emit())
+	
+	if audit_btn:
+		audit_btn.pressed.connect(func(): audit_requested.emit())
 	
 	if auto_btn:
 		auto_btn.pressed.connect(func(): automation_requested.emit())

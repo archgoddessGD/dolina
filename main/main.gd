@@ -137,6 +137,29 @@ func _ready() -> void:
 	%ResizeTimer.timeout.connect(_update_ui)
 	get_tree().set_auto_accept_quit(false)
 	
+	# 1. Setup Audit Dashboard
+	%AuditDashboard.setup(project_manager)
+	%AuditDashboard.close_requested.connect(func(): %AuditDashboard.hide())
+
+	# 2. Header Connection
+	header.audit_requested.connect(func():
+		%AuditDashboard.show()
+		%AuditDashboard.move_to_front()
+	)
+
+	# 3. The Review Workflow (Connecting the logic)
+	%AuditDashboard.review_requested.connect(func(stem, col_name, context_list):
+		# Get the full data reference
+		var dataset = project_manager.current_dataset
+		var cols = project_manager.current_columns
+		
+		# Open the viewer using the Context List (Review Queue) instead of the full dataset
+		side_by_side_viewer.open(dataset, context_list, stem, cols, col_name)
+		
+		# Ensure it is visible on top
+		side_by_side_viewer.move_to_front()
+	)
+	
 	# Inject ProjectManager into Automation
 	automation_dashboard.setup(project_manager)
 	
