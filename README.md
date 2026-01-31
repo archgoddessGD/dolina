@@ -10,7 +10,7 @@ Dolina is a desktop application built with Godot. It helps manage local datasets
 
 ## Video Showcase
 
-https://github.com/user-attachments/assets/1ce76094-7c1f-4408-898e-ec743636fd68
+https://github.com/user-attachments/assets/7cee3e42-5c6a-4400-8386-8f058278aa75
 
 ## Usage & Dataset Structure
 
