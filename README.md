@@ -96,7 +96,7 @@ Here is an example configuration. In this case, it points to files in the datase
 
 ```
 
-## Key Features
+## Features
 
 * **No Database:** Folders are columns; filenames are IDs. It works directly with your file system.
 * **Stem-Based Alignment:** Files from different folders (e.g., `images/001.png` and `tags/001.txt`) are aligned into a single row based on the filename (without extension).
@@ -134,3 +134,24 @@ Compare any two columns in fullscreen.
 * **Modes:** Compare Image-to-Image, Text-to-Text, or Image-to-Text.
 * **Independent Columns:** Set the left and right panels to display any column you want.
 * **Navigation:** Move between rows using buttons or keyboard shortcuts (Up/Down or if cursor is focused on text - Ctrl+Up/Down).
+
+### Automation Dashboard
+
+A visual, no-code batch processor for generating or modifying data using LLMs and vLMs.
+
+* **Visual Prompt Builder:** Add blocks to construct your prompt payload. Mix static text instructions with dynamic data from your existing columns (Text or Images).
+* **API Compatibility:** Supports OpenAI-compatible endpoints. I tested it with LMStudio (local), Openrouter and the Google Gemini API but it should work with any provider like OpenAI, Anthropic, Qwen, Deepseek etc.
+* **Load Balancing:** You may configure multiple API endpoints/keys with specific weights if you want to distribute requests for more diverse captioning styles.
+* **Live Preview:** See exactly what JSON payload will be sent to the API before starting the batch.
+* **Templates:** Save your prompt configurations and API settings as templates for reuse.
+
+### Audit Dashboard
+
+A quality control tool designed to detect and sanitize responses (refusals, conversational filler, and boilerplate) from text datasets.
+
+You can can the beginning and end of text files for user-defined phrases:
+* *Refusals:* (e.g., "I cannot," "I apologize").
+* *Preface:* (e.g., "Sure, here is the code," "Certainly").
+* *Postface:* (e.g., "Hope this helps," "Let me know").
+
+* **Review Queue:** Issues are aggregated into a list. Clicking an item instantly opens the text. When a file is opened the list can be navigated up or down from within the text editor.
