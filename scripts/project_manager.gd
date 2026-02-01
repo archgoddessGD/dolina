@@ -528,7 +528,8 @@ func register_new_column(col_name: String) -> void:
 	var proj_path = datasets_root_path + "/" + current_project_name
 	var config_path = proj_path + "/" + CONFIG_FILENAME
 	
-	# 1. Update Memory & Folders
+	# 1. Update Memory & Physical Folders
+	# This ensures the UI sees the new column immediately, regardless of config mode.
 	var new_folder_path = proj_path + "/" + col_name
 	if not DirAccess.dir_exists_absolute(new_folder_path):
 		DirAccess.make_dir_recursive_absolute(new_folder_path)
@@ -538,18 +539,23 @@ func register_new_column(col_name: String) -> void:
 		current_columns.append(col_name)
 		current_columns.sort()
 	
-	# 2. Update Config File
+	# 2. Update Config File (CONDITIONAL)
+	# STOP if the config file does not exist. Do not force creation.
+	if not FileAccess.file_exists(config_path):
+		print("No config file found. New column '%s' added via directory scan mode." % col_name)
+		return
+
+	# If we are here, the config EXISTS, so we must update it.
 	var data = {}
 	
 	# Safe Read
-	if FileAccess.file_exists(config_path):
-		var f_read = FileAccess.open(config_path, FileAccess.READ)
-		if f_read:
-			var json = JSON.new()
-			var err = json.parse(f_read.get_as_text())
-			if err == OK:
-				data = json.data
-			f_read.close()
+	var f_read = FileAccess.open(config_path, FileAccess.READ)
+	if f_read:
+		var json = JSON.new()
+		var err = json.parse(f_read.get_as_text())
+		if err == OK:
+			data = json.data
+		f_read.close()
 	
 	# Initialize Structure
 	if not data.has("columns") or not data["columns"] is Array:
@@ -596,6 +602,13 @@ func list_templates() -> Array[String]:
 func save_template(template_name: String, data: Dictionary) -> void:
 	# Sanitize name
 	var safe_name = template_name.validate_filename()
+	
+	if not DirAccess.dir_exists_absolute(templates_root_path):
+		var err = DirAccess.make_dir_recursive_absolute(templates_root_path)
+		if err != OK:
+			error_occurred.emit("Could not create templates folder: " + error_string(err))
+			return
+
 	var path = templates_root_path + "/" + safe_name + ".json"
 	
 	var f = FileAccess.open(path, FileAccess.WRITE)
@@ -603,6 +616,9 @@ func save_template(template_name: String, data: Dictionary) -> void:
 		f.store_string(JSON.stringify(data, "\t"))
 		f.close()
 		toast_requested.emit("Template Saved!")
+	else:
+		# Good practice: Notify if the file itself couldn't be opened (e.g. permissions)
+		error_occurred.emit("Failed to write template file.")
 
 func load_template(template_name: String) -> Dictionary:
 	var path = templates_root_path + "/" + template_name + ".json"
